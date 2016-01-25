@@ -1,11 +1,11 @@
 import {HttpClient} from 'aurelia-fetch-client';
-import {Authentication} from './authentication';
+import {AuthService} from './authService';
 import {BaseConfig} from './baseConfig';
 import {inject} from 'aurelia-framework';
 import {Storage} from './storage';
 import {Config, Rest} from 'spoonx/aurelia-api';
 
-@inject(HttpClient, Config, Authentication, Storage, BaseConfig)
+@inject(HttpClient, Config, AuthService, Storage, BaseConfig)
 export class FetchConfig {
   /**
    * Construct the FetchConfig
@@ -50,7 +50,23 @@ export class FetchConfig {
         request.headers.append(config.authHeader, token);
 
         return request;
-      }
+      },
+       response(response) {
+            if (response.ok) {
+              return response;
+            }
+            if (response.status == 401) {
+              if (auth.isTokenExpired() && config.httpInterceptor) {
+                let refreshTokenName: string = config.refreshTokenPrefix ? `${config.refreshTokenPrefix}_${config.refreshTokenName}` : config.refreshTokenName;
+                if (storage.get(refreshTokenName)) {
+                  auth.updateToken();
+                }
+                //TODO: Reissue Request when aurelia-fetch implements it
+              }
+            }
+            return response;
+
+          }
     };
   }
 

@@ -38,52 +38,22 @@ declare module 'aurelia-auth/storage' {
 declare module 'aurelia-auth/authentication' {
 	export class Authentication {
 	    constructor(storage: any, config: any);
+	    tokenName: any;
 	    getLoginRoute(): any;
 	    getLoginRedirect(): any;
 	    getLoginUrl(): any;
 	    getSignupUrl(): any;
 	    getProfileUrl(): any;
 	    getToken(): any;
+	    getRefreshToken(): any;
 	    getPayload(): any;
 	    setTokenFromResponse(response: any, redirect: any): void;
+	    setRefreshTokenFromResponse(response: any): void;
 	    removeToken(): void;
+	    removeRefreshToken(): void;
 	    isAuthenticated(): boolean;
+	    isTokenExpired(): boolean;
 	    logout(redirect: any): any;
-	}
-
-}
-declare module 'aurelia-auth/app.fetch-httpClient.config' {
-	export class FetchConfig {
-	    /**
-	     * Construct the FetchConfig
-	     *
-	     * @param {HttpClient} httpClient
-	     * @param {Config} clientConfig
-	     * @param {Authentication} authService
-	     * @param {Storage} storage
-	     * @param {BaseConfig} config
-	     */
-	    constructor(httpClient: any, clientConfig: any, authService: any, storage: any, config: any);
-	    /**
-	     * Interceptor for HttpClient
-	     *
-	     * @return {{request: Function}}
-	     */
-	    interceptor: {
-	        request(request: any): any;
-	    };
-	    /**
-	     * @param {HttpClient|Rest[]} client
-	     *
-	     * @return {HttpClient[]}
-	     */
-	    configure(client: any): any;
-	}
-
-}
-declare module 'aurelia-auth/authFilter' {
-	export class AuthFilterValueConverter {
-	    toView(routes: any, isAuthenticated: any): any;
 	}
 
 }
@@ -118,16 +88,55 @@ declare module 'aurelia-auth/oAuth2' {
 }
 declare module 'aurelia-auth/authService' {
 	export class AuthService {
+	    static IS_UPDATING_TOKEN: boolean;
 	    constructor(auth: any, oAuth1: any, oAuth2: any, config: any);
 	    getMe(criteria: any): any;
 	    updateMe(body: any, criteria: any): any;
 	    isAuthenticated(): any;
+	    isTokenExpired(): any;
 	    getTokenPayload(): any;
 	    signup(displayName: any, email: any, password: any): any;
 	    login(email: any, password: any): any;
 	    logout(redirectUri: any): any;
+	    updateToken(): any;
 	    authenticate(name: any, redirect: any, userData: any): any;
 	    unlink(provider: any): any;
+	}
+
+}
+declare module 'aurelia-auth/app.fetch-httpClient.config' {
+	export class FetchConfig {
+	    /**
+	     * Construct the FetchConfig
+	     *
+	     * @param {HttpClient} httpClient
+	     * @param {Config} clientConfig
+	     * @param {Authentication} authService
+	     * @param {Storage} storage
+	     * @param {BaseConfig} config
+	     */
+	    constructor(httpClient: any, clientConfig: any, authService: any, storage: any, config: any);
+	    /**
+	     * Interceptor for HttpClient
+	     *
+	     * @return {{request: Function}}
+	     */
+	    interceptor: {
+	        request(request: any): any;
+	        response(response: any): any;
+	    };
+	    /**
+	     * @param {HttpClient|Rest[]} client
+	     *
+	     * @return {HttpClient[]}
+	     */
+	    configure(client: any): any;
+	}
+
+}
+declare module 'aurelia-auth/authFilter' {
+	export class AuthFilterValueConverter {
+	    toView(routes: any, isAuthenticated: any): any;
 	}
 
 }

@@ -6,8 +6,8 @@ import authUtils from './authUtils';
 @inject(Storage, BaseConfig)
 export class Authentication {
   constructor(storage, config) {
-    this.storage   = storage;
-    this.config    = config.current;
+    this.storage = storage;
+    this.config = config.current;
   }
 
   get tokenName() {
@@ -37,13 +37,16 @@ export class Authentication {
   getToken() {
     return this.storage.get(this.tokenName);
   }
+  getRefreshToken() {
+    return this.storage.get(this.refreshTokenName);
+  }
 
   getPayload() {
     let token = this.storage.get(this.tokenName);
 
     if (token && token.split('.').length === 3) {
       let base64Url = token.split('.')[1];
-      let base64    = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
 
       try {
         return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
@@ -54,7 +57,7 @@ export class Authentication {
   }
 
   setTokenFromResponse(response, redirect) {
-    let tokenName   = this.tokenName;
+    let tokenName = this.tokenName;
     let accessToken = response && response[this.config.responseTokenProp];
     let token;
 
@@ -84,9 +87,41 @@ export class Authentication {
       window.location.href = window.encodeURI(redirect);
     }
   }
+  
+  setRefreshTokenFromResponse(response) {
+    let refreshTokenName = this.refreshTokenName;
+    let refreshToken = response && response.refresh_token;
+    let token;
+
+    if (refreshToken) {
+      if (authUtils.isObject(refreshToken) && authUtils.isObject(refreshToken.data)) {
+        response = refreshToken;
+      } else if (authUtils.isString(refreshToken)) {
+        token = refreshToken;
+      }
+    }
+
+    if (!token && response) {
+      token = this.config.refreshTokenRoot && response[this.config.refreshTokenRoot]
+        ? response[this.config.refreshTokenRoot][this.config.refreshTokenName]
+        : response[this.config.refreshTokenName];
+    }
+    if (!token) {
+      var refreshTokenPath = this.config.refreshTokenRoot
+        ? this.config.refreshTokenRoot + '.' + this.config.refreshTokenName
+        : this.config.refreshTokenName ;
+
+      throw new Error('Expecting a refresh token named "' + refreshTokenPath + '" but instead got: ' + JSON.stringify(response.content));
+    }
+
+    this.storage.set(refreshTokenName, token);
+  }
 
   removeToken() {
     this.storage.remove(this.tokenName);
+  }
+  removeRefreshToken() {
+    this.storage.remove(this.refreshTokenName);
   }
 
   isAuthenticated() {
@@ -103,7 +138,7 @@ export class Authentication {
     }
 
     let base64Url = token.split('.')[1];
-    let base64    = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     let exp;
 
     try {
@@ -119,9 +154,20 @@ export class Authentication {
     return true;
   }
 
+
+  isTokenExpired() {
+    let payload = this.getPayload();
+    let exp = payload ? payload.exp : null;
+    if (exp) {
+      return Math.round(new Date().getTime() / 1000) > exp
+    }
+
+    return undefined;
+  }
   logout(redirect) {
     return new Promise(resolve => {
       this.storage.remove(this.tokenName);
+      this.storage.remove(this.refreshTokenName);
 
       if (this.config.logoutRedirect && !redirect) {
         window.location.href = this.config.logoutRedirect;

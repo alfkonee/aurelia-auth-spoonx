@@ -14,6 +14,12 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
   var _authUtils2 = _interopRequireDefault(_authUtils);
 
   var AuthService = (function () {
+    _createClass(AuthService, null, [{
+      key: 'IS_UPDATING_TOKEN',
+      value: false,
+      enumerable: true
+    }]);
+
     function AuthService(auth, oAuth1, oAuth2, config) {
       _classCallCheck(this, _AuthService);
 
@@ -43,7 +49,21 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
     }, {
       key: 'isAuthenticated',
       value: function isAuthenticated() {
+        var isExpired = this.auth.isTokenExpired();
+        if (isExpired && this.config.autoUpdateToken) {
+          if (AuthService.IS_UPDATING_TOKEN) {
+            return true;
+          } else {
+            this.updateToken();
+          }
+        }
+
         return this.auth.isAuthenticated();
+      }
+    }, {
+      key: 'isTokenExpired',
+      value: function isTokenExpired() {
+        return this.auth.isTokenExpired();
       }
     }, {
       key: 'getTokenPayload',
@@ -82,7 +102,8 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
         var _this2 = this;
 
         var loginUrl = this.auth.getLoginUrl();
-        var content = undefined;
+        var config = this.config;
+        var content, options;
         if (typeof arguments[1] !== 'string') {
           content = arguments[0];
         } else {
@@ -92,9 +113,26 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
           };
         }
 
-        return this.client.post(loginUrl, content).then(function (response) {
-          _this2.auth.setTokenFromResponse(response);
+        if (this.config.postContentType === 'json') {
+          content = JSON.stringify(content);
+        } else if (this.config.postContentType === 'form') {
+          var data = [];
+          for (var key in content) {
+            data.push(key + "=" + content[key]);
+          }
+          content = data.join('&');
+          options = {
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded"
+            }
+          };
+        }
 
+        return this.client.post(loginUrl, content, options).then(function (response) {
+          _this2.auth.setTokenFromResponse(response);
+          if (config.useRefreshToken) {
+            _this2.auth.setRefreshTokenFromResponse(response);
+          }
           return response;
         });
       }
@@ -104,9 +142,56 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
         return this.auth.logout(redirectUri);
       }
     }, {
+      key: 'updateToken',
+      value: function updateToken() {
+        var _this3 = this;
+
+        AuthService.IS_UPDATING_TOKEN = true;
+        var loginUrl = this.auth.getLoginUrl();
+        var refreshToken = this.auth.getRefreshToken();
+        var clientId = this.config.clientId;
+        if (refreshToken) {
+          var content = clientId ? {
+            'grant_type': 'refresh_token',
+            'refresh_token': refreshToken,
+            'client_id': clientId
+          } : {
+            'grant_type': 'refresh_token',
+            'refresh_token': refreshToken
+          },
+              options;
+
+          if (this.config.postContentType === 'json') {
+            content = JSON.stringify(content);
+          } else if (this.config.postContentType === 'form') {
+            var data = [];
+            for (var key in content) {
+              data.push(key + "=" + content[key]);
+            }
+            content = data.join('&');
+            options = {
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+              }
+            };
+          }
+          return this.client.post(loginUrl, content, options).then(function (response) {
+            _this3.auth.setRefreshToken(response);
+            _this3.auth.setToken(response);
+            AuthService.IS_UPDATING_TOKEN = false;
+            return response;
+          })['catch'](function () {
+            _this3.auth.removeToken();
+            _this3.auth.removeRefreshToken();
+            AuthService.IS_UPDATING_TOKEN = false;
+            return null;
+          });
+        }
+      }
+    }, {
       key: 'authenticate',
       value: function authenticate(name, redirect, userData) {
-        var _this3 = this;
+        var _this4 = this;
 
         var provider = this.oAuth2;
         if (this.config.providers[name].type === '1.0') {
@@ -114,7 +199,7 @@ define(['exports', 'aurelia-framework', './authentication', './baseConfig', './o
         }
 
         return provider.open(this.config.providers[name], userData || {}).then(function (response) {
-          _this3.auth.setTokenFromResponse(response, redirect);
+          _this4.auth.setTokenFromResponse(response, redirect);
           return response;
         });
       }

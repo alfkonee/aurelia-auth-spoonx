@@ -1,4 +1,4 @@
-define(['exports', 'aurelia-fetch-client', './authentication', './baseConfig', 'aurelia-framework', './storage', 'spoonx/aurelia-api'], function (exports, _aureliaFetchClient, _authentication, _baseConfig, _aureliaFramework, _storage, _spoonxAureliaApi) {
+define(['exports', 'aurelia-fetch-client', './authService', './baseConfig', 'aurelia-framework', './storage', 'spoonx/aurelia-api'], function (exports, _aureliaFetchClient, _authService, _baseConfig, _aureliaFramework, _storage, _spoonxAureliaApi) {
   'use strict';
 
   Object.defineProperty(exports, '__esModule', {
@@ -77,13 +77,27 @@ define(['exports', 'aurelia-fetch-client', './authentication', './baseConfig', '
             _request.headers.append(config.authHeader, token);
 
             return _request;
+          },
+          response: function response(_response) {
+            if (_response.ok) {
+              return _response;
+            }
+            if (_response.status == 401) {
+              if (auth.isTokenExpired() && config.httpInterceptor) {
+                var refreshTokenName = config.refreshTokenPrefix ? config.refreshTokenPrefix + '_' + config.refreshTokenName : config.refreshTokenName;
+                if (storage.get(refreshTokenName)) {
+                  auth.updateToken();
+                }
+              }
+            }
+            return _response;
           }
         };
       }
     }]);
 
     var _FetchConfig = FetchConfig;
-    FetchConfig = (0, _aureliaFramework.inject)(_aureliaFetchClient.HttpClient, _spoonxAureliaApi.Config, _authentication.Authentication, _storage.Storage, _baseConfig.BaseConfig)(FetchConfig) || FetchConfig;
+    FetchConfig = (0, _aureliaFramework.inject)(_aureliaFetchClient.HttpClient, _spoonxAureliaApi.Config, _authService.AuthService, _storage.Storage, _baseConfig.BaseConfig)(FetchConfig) || FetchConfig;
     return FetchConfig;
   })();
 

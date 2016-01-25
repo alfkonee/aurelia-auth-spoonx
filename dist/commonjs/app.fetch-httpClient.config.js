@@ -10,7 +10,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 var _aureliaFetchClient = require('aurelia-fetch-client');
 
-var _authentication = require('./authentication');
+var _authService = require('./authService');
 
 var _baseConfig = require('./baseConfig');
 
@@ -88,13 +88,27 @@ var FetchConfig = (function () {
           _request.headers.append(config.authHeader, token);
 
           return _request;
+        },
+        response: function response(_response) {
+          if (_response.ok) {
+            return _response;
+          }
+          if (_response.status == 401) {
+            if (auth.isTokenExpired() && config.httpInterceptor) {
+              var refreshTokenName = config.refreshTokenPrefix ? config.refreshTokenPrefix + '_' + config.refreshTokenName : config.refreshTokenName;
+              if (storage.get(refreshTokenName)) {
+                auth.updateToken();
+              }
+            }
+          }
+          return _response;
         }
       };
     }
   }]);
 
   var _FetchConfig = FetchConfig;
-  FetchConfig = (0, _aureliaFramework.inject)(_aureliaFetchClient.HttpClient, _spoonxAureliaApi.Config, _authentication.Authentication, _storage.Storage, _baseConfig.BaseConfig)(FetchConfig) || FetchConfig;
+  FetchConfig = (0, _aureliaFramework.inject)(_aureliaFetchClient.HttpClient, _spoonxAureliaApi.Config, _authService.AuthService, _storage.Storage, _baseConfig.BaseConfig)(FetchConfig) || FetchConfig;
   return FetchConfig;
 })();
 

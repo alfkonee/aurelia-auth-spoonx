@@ -25,6 +25,13 @@ export class BaseConfig {
       profileUrl: '/auth/me',
       loginRoute: '/login',
       signupRoute: '/signup',
+      postContentType: 'json',//option form|json
+      useRefreshToken: false,
+      autoUpdateToken: true,
+      refreshTokenRoot: false,
+      refreshTokenName: 'refresh_token',
+      refreshTokenPrefix: 'aurelia',
+      clientId: '',
       tokenRoot: false,
       tokenName: 'token',
       tokenPrefix: 'aurelia',
