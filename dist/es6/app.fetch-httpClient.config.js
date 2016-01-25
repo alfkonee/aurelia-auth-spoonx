@@ -51,22 +51,21 @@ export class FetchConfig {
 
         return request;
       },
-       response(response) {
-            if (response.ok) {
-              return response;
+      response(response) {
+        if (response.ok) {
+          return response;
+        }
+        if (response.status === 401) {
+          if (auth.isTokenExpired() && config.httpInterceptor) {
+            let refreshTokenName = config.refreshTokenPrefix ? `${config.refreshTokenPrefix}_${config.refreshTokenName}` : config.refreshTokenName;
+            if (storage.get(refreshTokenName)) {
+              auth.updateToken();
             }
-            if (response.status == 401) {
-              if (auth.isTokenExpired() && config.httpInterceptor) {
-                let refreshTokenName: string = config.refreshTokenPrefix ? `${config.refreshTokenPrefix}_${config.refreshTokenName}` : config.refreshTokenName;
-                if (storage.get(refreshTokenName)) {
-                  auth.updateToken();
-                }
-                //TODO: Reissue Request when aurelia-fetch implements it
-              }
-            }
-            return response;
-
+            //TODO: Reissue Request when aurelia-fetch implements it
           }
+        }
+        return response;
+      }
     };
   }
 

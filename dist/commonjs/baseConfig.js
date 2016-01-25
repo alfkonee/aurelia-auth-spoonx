@@ -51,7 +51,7 @@ var BaseConfig = (function () {
       refreshTokenRoot: false,
       refreshTokenName: 'refresh_token',
       refreshTokenPrefix: 'aurelia',
-      clientId: '',
+      clientId: false,
       tokenRoot: false,
       tokenName: 'token',
       tokenPrefix: 'aurelia',

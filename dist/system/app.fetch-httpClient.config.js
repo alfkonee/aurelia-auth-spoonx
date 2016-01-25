@@ -96,7 +96,7 @@ System.register(['aurelia-fetch-client', './authService', './baseConfig', 'aurel
                 if (_response.ok) {
                   return _response;
                 }
-                if (_response.status == 401) {
+                if (_response.status === 401) {
                   if (auth.isTokenExpired() && config.httpInterceptor) {
                     var refreshTokenName = config.refreshTokenPrefix ? config.refreshTokenPrefix + '_' + config.refreshTokenName : config.refreshTokenName;
                     if (storage.get(refreshTokenName)) {

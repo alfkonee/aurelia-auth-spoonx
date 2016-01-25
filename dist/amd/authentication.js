@@ -64,7 +64,6 @@ define(['exports', 'aurelia-framework', './baseConfig', './storage', './authUtil
         if (token && token.split('.').length === 3) {
           var base64Url = token.split('.')[1];
           var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-
           try {
             return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
           } catch (error) {
@@ -110,6 +109,7 @@ define(['exports', 'aurelia-framework', './baseConfig', './storage', './authUtil
       value: function setRefreshTokenFromResponse(response) {
         var refreshTokenName = this.refreshTokenName;
         var refreshToken = response && response.refresh_token;
+        var refreshTokenPath = undefined;
         var token = undefined;
 
         if (refreshToken) {
@@ -124,7 +124,7 @@ define(['exports', 'aurelia-framework', './baseConfig', './storage', './authUtil
           token = this.config.refreshTokenRoot && response[this.config.refreshTokenRoot] ? response[this.config.refreshTokenRoot][this.config.refreshTokenName] : response[this.config.refreshTokenName];
         }
         if (!token) {
-          var refreshTokenPath = this.config.refreshTokenRoot ? this.config.refreshTokenRoot + '.' + this.config.refreshTokenName : this.config.refreshTokenName;
+          refreshTokenPath = this.config.refreshTokenRoot ? this.config.refreshTokenRoot + '.' + this.config.refreshTokenName : this.config.refreshTokenName;
 
           throw new Error('Expecting a refresh token named "' + refreshTokenPath + '" but instead got: ' + JSON.stringify(response.content));
         }
@@ -198,6 +198,11 @@ define(['exports', 'aurelia-framework', './baseConfig', './storage', './authUtil
 
           resolve();
         });
+      }
+    }, {
+      key: 'refreshTokenName',
+      get: function get() {
+        return this.config.refreshTokenPrefix ? this.config.refreshTokenPrefix + '_' + this.config.refreshTokenName : this.config.refreshTokenName;
       }
     }, {
       key: 'tokenName',

@@ -38,6 +38,7 @@ declare module 'aurelia-auth/storage' {
 declare module 'aurelia-auth/authentication' {
 	export class Authentication {
 	    constructor(storage: any, config: any);
+	    refreshTokenName: any;
 	    tokenName: any;
 	    getLoginRoute(): any;
 	    getLoginRedirect(): any;
@@ -88,7 +89,6 @@ declare module 'aurelia-auth/oAuth2' {
 }
 declare module 'aurelia-auth/authService' {
 	export class AuthService {
-	    static IS_UPDATING_TOKEN: boolean;
 	    constructor(auth: any, oAuth1: any, oAuth2: any, config: any);
 	    getMe(criteria: any): any;
 	    updateMe(body: any, criteria: any): any;

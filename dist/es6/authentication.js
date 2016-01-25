@@ -10,6 +10,10 @@ export class Authentication {
     this.config = config.current;
   }
 
+  get refreshTokenName() {
+    return this.config.refreshTokenPrefix ? this.config.refreshTokenPrefix + '_' + this.config.refreshTokenName : this.config.refreshTokenName;
+  }
+
   get tokenName() {
     return this.config.tokenPrefix ? this.config.tokenPrefix + '_' + this.config.tokenName : this.config.tokenName;
   }
@@ -37,6 +41,7 @@ export class Authentication {
   getToken() {
     return this.storage.get(this.tokenName);
   }
+
   getRefreshToken() {
     return this.storage.get(this.refreshTokenName);
   }
@@ -47,7 +52,6 @@ export class Authentication {
     if (token && token.split('.').length === 3) {
       let base64Url = token.split('.')[1];
       let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-
       try {
         return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
       } catch (error) {
@@ -87,10 +91,11 @@ export class Authentication {
       window.location.href = window.encodeURI(redirect);
     }
   }
-  
+
   setRefreshTokenFromResponse(response) {
     let refreshTokenName = this.refreshTokenName;
     let refreshToken = response && response.refresh_token;
+    let refreshTokenPath;
     let token;
 
     if (refreshToken) {
@@ -107,9 +112,9 @@ export class Authentication {
         : response[this.config.refreshTokenName];
     }
     if (!token) {
-      var refreshTokenPath = this.config.refreshTokenRoot
+      refreshTokenPath = this.config.refreshTokenRoot
         ? this.config.refreshTokenRoot + '.' + this.config.refreshTokenName
-        : this.config.refreshTokenName ;
+        : this.config.refreshTokenName;
 
       throw new Error('Expecting a refresh token named "' + refreshTokenPath + '" but instead got: ' + JSON.stringify(response.content));
     }
@@ -120,6 +125,7 @@ export class Authentication {
   removeToken() {
     this.storage.remove(this.tokenName);
   }
+
   removeRefreshToken() {
     this.storage.remove(this.refreshTokenName);
   }
@@ -159,11 +165,12 @@ export class Authentication {
     let payload = this.getPayload();
     let exp = payload ? payload.exp : null;
     if (exp) {
-      return Math.round(new Date().getTime() / 1000) > exp
+      return Math.round(new Date().getTime() / 1000) > exp;
     }
 
     return undefined;
   }
+
   logout(redirect) {
     return new Promise(resolve => {
       this.storage.remove(this.tokenName);
