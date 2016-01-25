@@ -78,13 +78,19 @@ export class AuthService {
   login(email, password) {
     let loginUrl = this.auth.getLoginUrl();
     let config = this.config;
+    let clientId = this.config.clientId;
     var content, options;
     if (typeof arguments[1] !== 'string') {
       content = arguments[0];
     } else {
-      content = {
+      content = clientId ?  {
         'email': email,
-        'password': password
+        'password': password,
+        'client_id': clientId
+      } 
+      : {
+        'email': email,
+        'password': password,
       };
     }
 
