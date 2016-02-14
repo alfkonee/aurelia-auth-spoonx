@@ -1,4 +1,4 @@
-System.register(['./authUtils', './baseConfig', 'aurelia-framework'], function (_export) {
+System.register(['./authUtils', './baseConfig', 'aurelia-dependency-injection'], function (_export) {
   'use strict';
 
   var authUtils, BaseConfig, inject, Popup;
@@ -12,8 +12,8 @@ System.register(['./authUtils', './baseConfig', 'aurelia-framework'], function (
       authUtils = _authUtils['default'];
     }, function (_baseConfig) {
       BaseConfig = _baseConfig.BaseConfig;
-    }, function (_aureliaFramework) {
-      inject = _aureliaFramework.inject;
+    }, function (_aureliaDependencyInjection) {
+      inject = _aureliaDependencyInjection.inject;
     }],
     execute: function () {
       Popup = (function () {
@@ -159,7 +159,7 @@ System.register(['./authUtils', './baseConfig', 'aurelia-framework'], function (
           value: function stringifyOptions(options) {
             var parts = [];
             authUtils.forEach(options, function (value, key) {
-              parts.push(key + '=' + value);
+              return parts.push(key + '=' + value);
             });
             return parts.join(',');
           }

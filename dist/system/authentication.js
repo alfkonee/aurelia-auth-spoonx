@@ -1,4 +1,4 @@
-System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'], function (_export) {
+System.register(['aurelia-dependency-injection', './baseConfig', './storage', './authUtils'], function (_export) {
   'use strict';
 
   var inject, BaseConfig, Storage, authUtils, Authentication;
@@ -8,8 +8,8 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
   function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
 
   return {
-    setters: [function (_aureliaFramework) {
-      inject = _aureliaFramework.inject;
+    setters: [function (_aureliaDependencyInjection) {
+      inject = _aureliaDependencyInjection.inject;
     }, function (_baseConfig) {
       BaseConfig = _baseConfig.BaseConfig;
     }, function (_storage) {
@@ -57,11 +57,6 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
             return this.storage.get(this.tokenName);
           }
         }, {
-          key: 'getRefreshToken',
-          value: function getRefreshToken() {
-            return this.storage.get(this.refreshTokenName);
-          }
-        }, {
           key: 'getPayload',
           value: function getPayload() {
             var token = this.storage.get(this.tokenName);
@@ -69,6 +64,7 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
             if (token && token.split('.').length === 3) {
               var base64Url = token.split('.')[1];
               var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+
               try {
                 return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
               } catch (error) {
@@ -110,41 +106,9 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
             }
           }
         }, {
-          key: 'setRefreshTokenFromResponse',
-          value: function setRefreshTokenFromResponse(response) {
-            var refreshTokenName = this.refreshTokenName;
-            var refreshToken = response && response.refresh_token;
-            var refreshTokenPath = undefined;
-            var token = undefined;
-
-            if (refreshToken) {
-              if (authUtils.isObject(refreshToken) && authUtils.isObject(refreshToken.data)) {
-                response = refreshToken;
-              } else if (authUtils.isString(refreshToken)) {
-                token = refreshToken;
-              }
-            }
-
-            if (!token && response) {
-              token = this.config.refreshTokenRoot && response[this.config.refreshTokenRoot] ? response[this.config.refreshTokenRoot][this.config.refreshTokenName] : response[this.config.refreshTokenName];
-            }
-            if (!token) {
-              refreshTokenPath = this.config.refreshTokenRoot ? this.config.refreshTokenRoot + '.' + this.config.refreshTokenName : this.config.refreshTokenName;
-
-              throw new Error('Expecting a refresh token named "' + refreshTokenPath + '" but instead got: ' + JSON.stringify(response.content));
-            }
-
-            this.storage.set(refreshTokenName, token);
-          }
-        }, {
           key: 'removeToken',
           value: function removeToken() {
             this.storage.remove(this.tokenName);
-          }
-        }, {
-          key: 'removeRefreshToken',
-          value: function removeRefreshToken() {
-            this.storage.remove(this.refreshTokenName);
           }
         }, {
           key: 'isAuthenticated',
@@ -176,24 +140,12 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
             return true;
           }
         }, {
-          key: 'isTokenExpired',
-          value: function isTokenExpired() {
-            var payload = this.getPayload();
-            var exp = payload ? payload.exp : null;
-            if (exp) {
-              return Math.round(new Date().getTime() / 1000) > exp;
-            }
-
-            return undefined;
-          }
-        }, {
           key: 'logout',
           value: function logout(redirect) {
             var _this = this;
 
             return new Promise(function (resolve) {
               _this.storage.remove(_this.tokenName);
-              _this.storage.remove(_this.refreshTokenName);
 
               if (_this.config.logoutRedirect && !redirect) {
                 window.location.href = _this.config.logoutRedirect;
@@ -203,11 +155,6 @@ System.register(['aurelia-framework', './baseConfig', './storage', './authUtils'
 
               resolve();
             });
-          }
-        }, {
-          key: 'refreshTokenName',
-          get: function get() {
-            return this.config.refreshTokenPrefix ? this.config.refreshTokenPrefix + '_' + this.config.refreshTokenName : this.config.refreshTokenName;
           }
         }, {
           key: 'tokenName',

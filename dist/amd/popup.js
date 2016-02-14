@@ -1,4 +1,4 @@
-define(['exports', './authUtils', './baseConfig', 'aurelia-framework'], function (exports, _authUtils, _baseConfig, _aureliaFramework) {
+define(['exports', './authUtils', './baseConfig', 'aurelia-dependency-injection'], function (exports, _authUtils, _baseConfig, _aureliaDependencyInjection) {
   'use strict';
 
   Object.defineProperty(exports, '__esModule', {
@@ -156,14 +156,14 @@ define(['exports', './authUtils', './baseConfig', 'aurelia-framework'], function
       value: function stringifyOptions(options) {
         var parts = [];
         _authUtils2['default'].forEach(options, function (value, key) {
-          parts.push(key + '=' + value);
+          return parts.push(key + '=' + value);
         });
         return parts.join(',');
       }
     }]);
 
     var _Popup = Popup;
-    Popup = (0, _aureliaFramework.inject)(_baseConfig.BaseConfig)(Popup) || Popup;
+    Popup = (0, _aureliaDependencyInjection.inject)(_baseConfig.BaseConfig)(Popup) || Popup;
     return Popup;
   })();
 

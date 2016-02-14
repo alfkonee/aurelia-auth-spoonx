@@ -16,7 +16,7 @@ var _authUtils2 = _interopRequireDefault(_authUtils);
 
 var _baseConfig = require('./baseConfig');
 
-var _aureliaFramework = require('aurelia-framework');
+var _aureliaDependencyInjection = require('aurelia-dependency-injection');
 
 var Popup = (function () {
   function Popup(config) {
@@ -161,14 +161,14 @@ var Popup = (function () {
     value: function stringifyOptions(options) {
       var parts = [];
       _authUtils2['default'].forEach(options, function (value, key) {
-        parts.push(key + '=' + value);
+        return parts.push(key + '=' + value);
       });
       return parts.join(',');
     }
   }]);
 
   var _Popup = Popup;
-  Popup = (0, _aureliaFramework.inject)(_baseConfig.BaseConfig)(Popup) || Popup;
+  Popup = (0, _aureliaDependencyInjection.inject)(_baseConfig.BaseConfig)(Popup) || Popup;
   return Popup;
 })();
 

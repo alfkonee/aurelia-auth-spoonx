@@ -1,4 +1,4 @@
-System.register(['aurelia-framework', './authUtils', './storage', './popup', './baseConfig'], function (_export) {
+System.register(['aurelia-dependency-injection', './authUtils', './storage', './popup', './baseConfig'], function (_export) {
   'use strict';
 
   var inject, authUtils, Storage, Popup, BaseConfig, OAuth1;
@@ -8,8 +8,8 @@ System.register(['aurelia-framework', './authUtils', './storage', './popup', './
   function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } }
 
   return {
-    setters: [function (_aureliaFramework) {
-      inject = _aureliaFramework.inject;
+    setters: [function (_aureliaDependencyInjection) {
+      inject = _aureliaDependencyInjection.inject;
     }, function (_authUtils) {
       authUtils = _authUtils['default'];
     }, function (_storage) {
@@ -40,33 +40,35 @@ System.register(['aurelia-framework', './authUtils', './storage', './popup', './
         _createClass(OAuth1, [{
           key: 'open',
           value: function open(options, userData) {
-            authUtils.extend(this.defaults, options);
+            var _this = this;
 
-            var serverUrl = this.config.baseUrl ? authUtils.joinUrl(this.config.baseUrl, this.defaults.url) : this.defaults.url;
+            var current = authUtils.extend({}, this.defaults, options);
+
+            var serverUrl = this.config.baseUrl ? authUtils.joinUrl(this.config.baseUrl, current.url) : current.url;
 
             if (this.config.platform !== 'mobile') {
-              this.popup = this.popup.open('', this.defaults.name, this.defaults.popupOptions, this.defaults.redirectUri);
+              this.popup = this.popup.open('', current.name, current.popupOptions, current.redirectUri);
             }
-            var self = this;
+
             return this.client.post(serverUrl).then(function (response) {
-              if (self.config.platform === 'mobile') {
-                self.popup = self.popup.open([self.defaults.authorizationEndpoint, self.buildQueryString(response)].join('?'), self.defaults.name, self.defaults.popupOptions, self.defaults.redirectUri);
+              if (_this.config.platform === 'mobile') {
+                _this.popup = _this.popup.open([current.authorizationEndpoint, _this.buildQueryString(response)].join('?'), current.name, current.popupOptions, current.redirectUri);
               } else {
-                self.popup.popupWindow.location = [self.defaults.authorizationEndpoint, self.buildQueryString(response)].join('?');
+                _this.popup.popupWindow.location = [current.authorizationEndpoint, _this.buildQueryString(response)].join('?');
               }
 
-              var popupListener = self.config.platform === 'mobile' ? self.popup.eventListener(self.defaults.redirectUri) : self.popup.pollPopup();
+              var popupListener = _this.config.platform === 'mobile' ? _this.popup.eventListener(current.redirectUri) : _this.popup.pollPopup();
 
               return popupListener.then(function (result) {
-                return self.exchangeForToken(result, userData);
+                return _this.exchangeForToken(result, userData, current);
               });
             });
           }
         }, {
           key: 'exchangeForToken',
-          value: function exchangeForToken(oauthData, userData) {
+          value: function exchangeForToken(oauthData, userData, current) {
             var data = authUtils.extend({}, userData, oauthData);
-            var exchangeForTokenUrl = this.config.baseUrl ? authUtils.joinUrl(this.config.baseUrl, this.defaults.url) : this.defaults.url;
+            var exchangeForTokenUrl = this.config.baseUrl ? authUtils.joinUrl(this.config.baseUrl, current.url) : current.url;
             var credentials = this.config.withCredentials ? 'include' : 'same-origin';
 
             return this.client.post(exchangeForTokenUrl, data, { credentials: credentials });
@@ -77,7 +79,7 @@ System.register(['aurelia-framework', './authUtils', './storage', './popup', './
             var str = [];
 
             authUtils.forEach(obj, function (value, key) {
-              str.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
+              return str.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
             });
 
             return str.join('&');
