@@ -1,12 +1,13 @@
-import {inject} from 'aurelia-dependency-injection';
-import {Authentication} from './authentication';
-import {BaseConfig} from './baseConfig';
-import {OAuth1} from './oAuth1';
-import {OAuth2} from './oAuth2';
-import authUtils from './authUtils';
+var _dec, _class;
 
-@inject(Authentication, OAuth1, OAuth2, BaseConfig)
-export class AuthService {
+import { inject } from 'aurelia-dependency-injection';
+import { Authentication } from './authentication';
+import { BaseConfig } from './baseConfig';
+import { OAuth1 } from './oAuth1';
+import { OAuth2 } from './oAuth2';
+import { authUtils } from './authUtils';
+
+export let AuthService = (_dec = inject(Authentication, OAuth1, OAuth2, BaseConfig), _dec(_class = class AuthService {
   constructor(auth, oAuth1, oAuth2, config) {
     this.isRefreshing = false;
     this.auth = auth;
@@ -61,8 +62,7 @@ export class AuthService {
         'password': password
       };
     }
-    return this.client.post(signupUrl, content)
-      .then(response => {
+    return this.client.post(signupUrl, content).then(response => {
         if (this.config.loginOnSignup) {
           this.auth.setTokenFromResponse(response);
         } else if (this.config.signupRedirect) {
@@ -172,8 +172,7 @@ export class AuthService {
       provider = this.oAuth1;
     }
 
-    return provider.open(this.config.providers[name], userData || {})
-      .then(response => {
+    return provider.open(this.config.providers[name], userData || {}).then(response => {
         this.auth.setTokenFromResponse(response, redirect);
         return response;
       });
@@ -188,4 +187,4 @@ export class AuthService {
       return this.client.post(unlinkUrl, provider);
     }
   }
-}
+}) || _class);

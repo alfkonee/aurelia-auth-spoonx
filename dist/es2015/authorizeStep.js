@@ -1,9 +1,10 @@
-import {inject} from 'aurelia-dependency-injection';
-import {Authentication} from './authentication';
-import {Redirect} from 'aurelia-router';
+var _dec, _class;
 
-@inject(Authentication)
-export class AuthorizeStep {
+import { inject } from 'aurelia-dependency-injection';
+import { Authentication } from './authentication';
+import { Redirect } from 'aurelia-router';
+
+export let AuthorizeStep = (_dec = inject(Authentication), _dec(_class = class AuthorizeStep {
   constructor(auth) {
     this.auth = auth;
   }
@@ -16,11 +17,11 @@ export class AuthorizeStep {
       if (!isLoggedIn) {
         return next.cancel(new Redirect(loginRoute));
       }
-    } else if (isLoggedIn && routingContext.getAllInstructions().some(i => i.fragment) === loginRoute) {
+    } else if (isLoggedIn && routingContext.getAllInstructions().some(i => i.fragment === loginRoute)) {
       let loginRedirect = this.auth.getLoginRedirect();
       return next.cancel(new Redirect(loginRedirect));
     }
 
     return next();
   }
-}
+}) || _class);

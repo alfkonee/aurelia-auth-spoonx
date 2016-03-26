@@ -1,7 +1,7 @@
 import {Container} from 'aurelia-dependency-injection';
-import {FetchConfig} from '../src/index';
+import {FetchConfig} from '../src/aurelia-authentication';
 import {HttpClient} from 'aurelia-fetch-client';
-import {Config, Rest} from 'spoonx/aurelia-api';
+import {Config} from 'spoonx/aurelia-api';
 
 function getContainer() {
   let container = new Container();
@@ -15,7 +15,72 @@ function getContainer() {
   return container;
 }
 
+function getInterceptorStubs(isAuthenticated, httpInterceptor) {
+  let authenticationStub = {
+    isAuthenticated: () => { return isAuthenticated; },
+    getToken: () => { return 'someToken'; }
+  };
+
+  let configStub = {
+    current: {
+      httpInterceptor: httpInterceptor,
+      authHeader: 'AuthoriseHeader',
+      authToken: 'AuthoriseToken'
+    }
+  };
+
+  let requestStub = {
+    headers: {
+      append: (header, value) => {}
+    }
+  };
+
+  return {
+    authenticationStub: authenticationStub,
+    configStub: configStub,
+    requestStub: requestStub
+  };
+}
+
 describe('FetchConfig', function() {
+  describe('.intercept()', function() {
+    it('Should intercept requests when authenticated.', function() {
+      let { authenticationStub, configStub, requestStub } = getInterceptorStubs(true, true);
+
+      spyOn(requestStub.headers, 'append');
+
+      let fetchConfig = new FetchConfig(null, null, authenticationStub, configStub);
+      let chain = fetchConfig.interceptor.request(requestStub);
+
+      expect(chain).toBe(requestStub);
+      expect(requestStub.headers.append).toHaveBeenCalledWith('AuthoriseHeader', 'AuthoriseToken someToken');
+    });
+
+    it('Should not intercept requests when unauthenticated.', function() {
+      let { authenticationStub, configStub, requestStub } = getInterceptorStubs(false, true);
+
+      spyOn(requestStub.headers, 'append');
+
+      let fetchConfig = new FetchConfig(null, null, authenticationStub, configStub);
+      let chain = fetchConfig.interceptor.request(requestStub);
+
+      expect(chain).toBe(requestStub);
+      expect(requestStub.headers.append).not.toHaveBeenCalled();
+    });
+
+    it('Should not intercept requests when authenticated with the httpInterceptor disabled.', function() {
+      let { authenticationStub, configStub, requestStub } = getInterceptorStubs(true, false);
+
+      spyOn(requestStub.headers, 'append');
+
+      let fetchConfig = new FetchConfig(null, null, authenticationStub, configStub);
+      let chain = fetchConfig.interceptor.request(requestStub);
+
+      expect(chain).toBe(requestStub);
+      expect(requestStub.headers.append).not.toHaveBeenCalled();
+    });
+  });
+
   describe('.configure()', function() {
     it('Should configure given client as instance of HttpClient.', function() {
       let container   = new Container();
@@ -130,18 +195,3 @@ describe('FetchConfig', function() {
     });
   });
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -2,7 +2,6 @@ import {HttpClient} from 'aurelia-fetch-client';
 import {AuthService} from './authService';
 import {BaseConfig} from './baseConfig';
 import {inject} from 'aurelia-dependency-injection';
-import {Storage} from './storage';
 import {Config, Rest} from 'spoonx/aurelia-api';
 
 @inject(HttpClient, Config, AuthService, Storage, BaseConfig)
@@ -13,14 +12,12 @@ export class FetchConfig {
    * @param {HttpClient} httpClient
    * @param {Config} clientConfig
    * @param {Authentication} authService
-   * @param {Storage} storage
    * @param {BaseConfig} config
    */
-  constructor(httpClient, clientConfig, authService, storage, config) {
+  constructor(httpClient, clientConfig, authentication, config) {
     this.httpClient   = httpClient;
     this.clientConfig = clientConfig;
-    this.auth         = authService;
-    this.storage      = storage;
+    this.auth         = authentication;
     this.config       = config.current;
   }
 
@@ -32,7 +29,6 @@ export class FetchConfig {
   get interceptor() {
     let auth    = this.auth;
     let config  = this.config;
-    let storage = this.storage;
 
     return {
       request(request) {
@@ -40,8 +36,7 @@ export class FetchConfig {
           return request;
         }
 
-        let tokenName = config.tokenPrefix ? `${config.tokenPrefix}_${config.tokenName}` : config.tokenName;
-        let token     = storage.get(tokenName);
+        let token = auth.getToken();
 
         if (config.authHeader && config.authToken) {
           token = `${config.authToken} ${token}`;
@@ -92,9 +87,7 @@ export class FetchConfig {
       client = this.httpClient;
     }
 
-    client.configure(httpConfig => {
-      httpConfig.withBaseUrl(client.baseUrl).withInterceptor(this.interceptor);
-    });
+    client.interceptors.push(this.interceptor);
 
     return client;
   }

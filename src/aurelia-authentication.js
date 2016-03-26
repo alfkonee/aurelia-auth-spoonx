@@ -1,10 +1,11 @@
-export {AuthService} from './authService';
-export {AuthorizeStep} from './authorizeStep';
+import {HttpClient} from 'aurelia-fetch-client';
+import {Config, Rest} from 'spoonx/aurelia-api';
+
+import {AuthService} from './authService';
+import {AuthorizeStep} from './authorizeStep';
 import {BaseConfig} from './baseConfig';
 import {FetchConfig} from './app.fetch-httpClient.config';
-export {FetchConfig} from './app.fetch-httpClient.config';
-import {Config, Rest} from 'spoonx/aurelia-api';
-import {HttpClient} from 'aurelia-fetch-client';
+import {authUtils} from './authUtils';
 
 /**
  * Configure the plugin.
@@ -12,7 +13,7 @@ import {HttpClient} from 'aurelia-fetch-client';
  * @param {{globalResources: Function, container: {Container}}} aurelia
  * @param {{}|Function}                                         config
  */
-export function configure(aurelia, config) {
+function configure(aurelia, config) {
   aurelia.globalResources('./authFilter');
 
   let baseConfig   = aurelia.container.get(BaseConfig);
@@ -45,3 +46,11 @@ export function configure(aurelia, config) {
   // Set the client on the config, for use throughout the plugin.
   baseConfig.current.client = client;
 }
+
+export {
+  configure,
+  FetchConfig,
+  AuthService,
+  AuthorizeStep,
+  authUtils
+};

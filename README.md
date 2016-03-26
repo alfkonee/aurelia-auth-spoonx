@@ -1,40 +1,40 @@
-# Aurelia-auth
+# aurelia-authentication
 
-[![Build Status](https://travis-ci.org/SpoonX/aurelia-auth.svg)](https://travis-ci.org/SpoonX/aurelia-auth)
+[![Build Status](https://travis-ci.org/SpoonX/aurelia-authentication.svg)](https://travis-ci.org/SpoonX/aurelia-authentication)
 [![Join the chat at https://gitter.im/SpoonX/Dev](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/SpoonX/Dev?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 > Makes setting up authentication for your Aurelia app simple.
 
-## What is aurelia-auth?
-This is a largely refactored module based on [paul van bladel's aurelia-auth](https://github.com/paulvanbladel/aurelia-auth/).
+## What is aurelia-authentication?
+This is a largely refactored module based on [paul van bladel's aurelia-authentication](https://github.com/paulvanbladel/aurelia-auth/).
 
-aurelia-auth is a token-based authentication plugin for [Aurelia](http://aurelia.io/) with support for popular social authentication providers (Google, Twitter, Facebook, LinkedIn, Windows Live, FourSquare, Yahoo, Github, Instagram) and a local stragegy, i.e. simple username / email and password.
+aurelia-authentication is a token-based authentication plugin for [Aurelia](http://aurelia.io/) with support for popular social authentication providers (Google, Twitter, Facebook, LinkedIn, Windows Live, FourSquare, Yahoo, Github, Instagram) and a local stragegy, i.e. simple username / email and password.
 
-aurelia-auth is a port of the great [Satellizer](https://github.com/sahat/satellizer/) library to ES6 and packaged as an Aurelia plugin.
+aurelia-authentication is a port of the great [Satellizer](https://github.com/sahat/satellizer/) library to ES6 and packaged as an Aurelia plugin.
 
 Other OAuth1 and Oauth2 than the above mentioned providers can be simply added by editing the extensible configuration file.
 
-Basically, aurelia-auth does not use any cookies but relies on a JWT (json web token) stored in the local storage of the browser:
+Basically, aurelia-authentication does not use any cookies but relies on a JWT (json web token) stored in the local storage of the browser:
 
 ![JWT in local storage](./pictures/TokenViaDevelopmentTools.png)
 
-Both **local storage** as well as **session storage** can be used (via the aurelia-auth security configuration file).
+Both **local storage** as well as **session storage** can be used (via the aurelia-authentication security configuration file).
 
-Spoonx/aurelia-auth makes use of [aurelia-api](https://github.com/SpoonX/aurelia-api) for convenient use of the aurelia-fetch-client. Options are available to directly use aurelia-fetch-client instead. If configured, the aurelia token will be sent automatically to your protected API when the user is authenticated.
+Spoonx/aurelia-authentication makes use of [aurelia-api](https://github.com/SpoonX/aurelia-api) for convenient use of the aurelia-fetch-client. Options are available to directly use aurelia-fetch-client instead. If configured, the aurelia token will be sent automatically to your protected API when the user is authenticated.
 
 ![Authentication header](./pictures/authHeader.png)
 
 ## Installation
 We assume that you know about ([NodeJs](https://nodejs.org/), [Gulp](http://gulpjs.com/)) and [Aurelia](http://aurelia.io/).
-Since aurelia-auth is an [Aurelia plugin](https://github.com/aurelia/skeleton-plugin), we also assume that you have your [Aurelia](http://aurelia.io/) project up and running.
+Since aurelia-authentication is an [Aurelia plugin](https://github.com/aurelia/skeleton-plugin), we also assume that you have your [Aurelia](http://aurelia.io/) project up and running.
 
 ```
-jspm install github:spoonx/aurelia-auth
+jspm install github:spoonx/aurelia-authentication
 ```
 
-## How to use aurelia-auth?
-aurelia-auth does not contain any UI widgets. It's conceived as a simple service with following interface:
-```
+## How to use aurelia-authentication?
+aurelia-authentication does not contain any UI widgets. It's conceived as a simple service with following interface:
+```javascript
 login(email, password)
 logout(redirectUri)
 authenticate(provider, redirect, userData)
@@ -47,11 +47,11 @@ unlink(provider)
 ```
 Login is used for the local authentication strategy (email + password). Authenticate is for social media authentication. Authenticate is also used for linking a social media account to an existing account.
 
-### Add an aurelia-auth security configuration file
-Add an javascript file to your project where you will store the aurelia-auth  security configuration data. Call it for example authConfig.js.
-Since this file is available via the browser, it should never contain sensitive data. Note that for OAuth the clientId is non sensitive. The client secret is sensitive data and should be only available server side. The aurelia-auth config file is compatible with the original Satellizer config file, easing the migration of AngularJs projects to Aurelia.
+### Add an aurelia-authentication security configuration file
+Add an javascript file to your project where you will store the aurelia-authentication  security configuration data. Call it for example authConfig.js.
+Since this file is available via the browser, it should never contain sensitive data. Note that for OAuth the clientId is non sensitive. The client secret is sensitive data and should be only available server side. The aurelia-authentication config file is compatible with the original Satellizer config file, easing the migration of AngularJs projects to Aurelia.
 
-Spoonx/aurelia-auth uses [aurelia-api](https://github.com/SpoonX/aurelia-api). Set here the aurelia-api endpoint for the authorization requests and specify all endpoints you want to have configured for authorized requests. The aurelia token will be added to requests to those endpoints.
+Spoonx/aurelia-authentication uses [aurelia-api](https://github.com/SpoonX/aurelia-api). Set here the aurelia-api endpoint for the authorization requests and specify all endpoints you want to have configured for authorized requests. The aurelia token will be added to requests to those endpoints.
 
 ```js
 var baseConfig = {
@@ -92,10 +92,10 @@ var configForProduction = {
 
 var config;
 if (window.location.hostname === 'localhost') {
-    config = Object.assign({}, baseConfig, configForDevelopment};
+    config = Object.assign({}, baseConfig, configForDevelopment);
 }
 else {
-    config = Object.assign({}, baseConfig, configForProduction};
+    config = Object.assign({}, baseConfig, configForProduction);
 }
 
 export default config;
@@ -105,9 +105,9 @@ The above configuration file can cope with a development and production version 
 
 ### Update the aurelia configuration file
 
-In your aurelia configuration file, add the plugin and inject the aurelia-auth security configuration file.
+In your aurelia configuration file, add the plugin and inject the aurelia-authentication security configuration file.
 
-While not mandantory, spoonx/aureli-auth is easiest to use in conjunction with [aurelia-api](https://github.com/SpoonX/aurelia-api). Aurelia-api allows to setup several endpoints for Rest services. This can be used to seperate public and protected routes. For that, we first need to register the endpoints with aurelia-api. Bellow we setup the endpoints 'auth' and 'protected-api'. These will be setup in the proceeding spoonx/aurelia-auth-plugin configuration for authorized access (specified in above authConfig.js example). The endpoint 'public-api' bellow could be used for public access only, since we didn't add it above to the 'configureEndpoints' array and thus the access token will not be added by aurelia-auth.
+While not mandantory, spoonx/aureli-auth is easiest to use in conjunction with [aurelia-api](https://github.com/SpoonX/aurelia-api). Aurelia-api allows to setup several endpoints for Rest services. This can be used to seperate public and protected routes. For that, we first need to register the endpoints with aurelia-api. Bellow we setup the endpoints 'auth' and 'protected-api'. These will be setup in the proceeding spoonx/aurelia-authentication-plugin configuration for authorized access (specified in above authConfig.js example). The endpoint 'public-api' bellow could be used for public access only, since we didn't add it above to the 'configureEndpoints' array and thus the access token will not be added by aurelia-authentication.
 
 ```javascript
 import authConfig from './authConfig';
@@ -118,14 +118,14 @@ export function configure(aurelia) {
     .standardConfiguration()
     .developmentLogging()    
     /* setup the api endpoints first (if desired) */
-    .plugin('spoonx/aurelia-api', configure=>{
+    .plugin('spoonx/aurelia-api', configure => {
       configure
         .registerEndpoint('auth', 'https://myapi.org/auth')
         .registerEndpoint('protected-api', 'https://myapi.org/protected-api')
         .registerEndpoint('public-api', 'http://myapi.org/public-api');
     })
-    /* configure spoonx/aurelia-auth */
-    .plugin('spoonx/aurelia-auth', baseConfig=>{
+    /* configure spoonx/aurelia-authentication */
+    .plugin('spoonx/aurelia-authentication', baseConfig => {
         baseConfig.configure(authConfig);
     });
 
@@ -136,18 +136,18 @@ export function configure(aurelia) {
 
 ### Provide a UI for a login, signup and profile.
 
-See aurelia-auth-samples for more details.
+See aurelia-authentication-samples for more details.
 
 Button actions are passed to the corresponding view model via a simple click.delegate:
 ```html
 <button class="btn btn-block btn-google-plus" click.delegate="authenticate('google')">
-          <span class="ion-social-googleplus"></span>Sign in with Google
+    <span class="ion-social-googleplus"></span>Sign in with Google
 </button>
 ```
 
-The login view model will speak directly with the aurelia-auth service, which is made available via constructor injection.
+The login view model will speak directly with the aurelia-authentication service, which is made available via constructor injection.
 ```js
-import {AuthService} from 'spoonx/aurelia-auth';
+import {AuthService} from 'spoonx/aurelia-authentication';
 import {inject} from 'aurelia-framework';
 @inject(AuthService)
 
@@ -162,17 +162,17 @@ export class Login {
     password = '';
     login() {
         return this.auth.login(this.email, this.password)
-        .then(response=>{
+        .then(response => {
             console.log("success logged " + response);
         })
-        .catch(err=>{
+        .catch(err => {
             console.log("login failure");
         });
     };
 
     authenticate(name) {
         return this.auth.authenticate(name, false, null)
-        .then(response=>{
+        .then(response => {
             console.log("auth response " + response);
         });
     }
@@ -221,139 +221,198 @@ Menu items visibility can also be linked with the authFilter to the isAuthentica
 In the router config function, you can specifify an auth property in the routing map indicating wether or not the user needs to be authenticated in order to access the route:
 
 ```js
-configure(){
-    var appRouterConfig = function(config){
+import {AuthorizeStep} from 'spoonx/aurelia-authentication';
+
+export class App {
+    configureRouter(config, router) {
         config.title = 'Aurelia';
+
         config.addPipelineStep('authorize', AuthorizeStep); // Add a route filter to the authorize extensibility point.
 
         config.map([
             { route: ['','welcome'],  moduleId: './welcome',  nav: true, title: 'Welcome' },
             { route: 'flickr',        moduleId: './flickr',   nav: true, title: 'Flickr' },
             { route: 'customer',      moduleId: './customer', nav: true, title: 'CRM', auth: true },
-
             ...
+        ]);
 
-            ]);
-        };
-
-        this.router.configure(appRouterConfig);
-    }
+        ...
+    };
+}
 ```
 In the above example the customer route is only available for authenticated users.
 
 ## Full configuration options.
 
-Via the above mentioned configuration virtually all aspects of the authentication process be tweaked:
+Via the above mentioned configuration virtually all aspects of the authentication process can be tweaked:
 
 ```js
-  httpInterceptor: true,
-  endpoint: null,
-  configureEndpoints: null,
-  loginOnSignup: true,
-  baseUrl: '/',
-  loginRedirect: '/#customer',
-  logoutRedirect: '/',
-  signupRedirect: '/login',
-  loginUrl: '/auth/login',
-  signupUrl: '/auth/signup',
-  profileUrl: '/auth/me',
-  loginRoute: '/login',
-  signupRoute: '/signup',
-  tokenRoot: false,
-  tokenName: 'token',
-  tokenPrefix: 'aurelia',
-  unlinkUrl: '/auth/unlink/',
-  unlinkMethod: 'get',
-  authHeader: 'Authorization',
-  responseTokenProp: 'access_token',
-  authToken: 'Bearer',
-  withCredentials: true,
-  platform: 'browser',
-  storage: 'localStorage',
-  providers: {
-    google: {
-      name: 'google',
-      url: '/auth/google',
-      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
-      redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-      scope: ['profile', 'email'],
-      scopePrefix: 'openid',
-      scopeDelimiter: ' ',
-      requiredUrlParams: ['scope'],
-      optionalUrlParams: ['display'],
-      display: 'popup',
-      type: '2.0',
-      /*clientId: '239531826023-ibk10mb9p7ull54j55a61og5lvnjrff6.apps.googleusercontent.com',*/
-      popupOptions: { width: 452, height: 633 }
+// If using aurelia-api:
+// =====================
+
+// This is the endpoint used for any requests made in relation to authentication (login, logout, etc.)
+endpoint: null,
+// When authenticated, these endpoints will have the token added to the header of any requests (for authorization)
+configureEndpoints: null,
+
+
+// SPA related options
+// ===================
+
+// The SPA url to which the user is redirected after a successful login
+loginRedirect: '#/customer',
+// The SPA url to which the user is redirected after a successful logout
+logoutRedirect: '#/',
+// The SPA route used when an unauthenticated user tries to access an SPA page that requires authentication
+loginRoute: '/login',
+// Whether or not an authentication token is provided in the response to a successful signup
+loginOnSignup: true,
+// If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
+signupRedirect: '#/login',
+
+
+// API related options
+// ===================
+
+// The base url used for all authentication related requests, including
+// provider.url  bellow. This appends to the httpClient/endpoint base url,
+//  it does not override it.
+baseUrl: '/auth',
+// The API endpoint to which login requests are sent
+loginUrl: '/login',
+// The API endpoint to which signup requests are sent
+signupUrl: '/signup',
+// The API endpoint used in profile requests (inc. `find/get` and `update`)
+profileUrl: '/me',
+// The API endpoint used with oAuth to unlink authentication
+unlinkUrl: '/unlink/',
+// The HTTP method used for 'unlink' requests (Options: 'get' or 'post')
+unlinkMethod: 'get',
+
+
+// Token Related options
+// =====================
+
+// The header property used to contain the authToken in the header of API requests that require authentication
+authHeader: 'Authorization',
+// The token name used in the header of API requests that require authentication
+authToken: 'Bearer',
+// The the property from which to get the authentication token after a successful login or signup
+responseTokenProp: 'access_token',
+
+// If the property defined by `responseTokenProp` is an object:
+// ------------------------------------------------------------
+
+//This is the property from which to get the token `{ "responseTokenProp": { "tokenName" : '...' } }`
+tokenName: 'token',
+// This allows the token to be a further object deeper `{ "responseTokenProp": { "tokenRoot" : { "tokenName" : '...' } } }`
+tokenRoot: false,
+
+
+// Miscellaneous Options
+// =====================
+
+// Whether to enable the fetch interceptor which automatically adds the authentication headers
+// (or not... e.g. if using a session based API or you want to override the default behaviour)
+httpInterceptor: true,
+// The base url used for all authentication related requests (This appends to the httpClient/endpoint base url, it does not override it)
+baseUrl: null,
+// For OAuth only: Tell the API whether or not to include token cookies in the response (for session based APIs)
+withCredentials: true,
+// Controls how the popup is shown for different devices (Options: 'browser' or 'mobile')
+platform: 'browser',
+// Determines the `window` property name upon which aurelia-authentication data is stored (Default: `window.localStorage`)
+storage: 'localStorage',
+// Prepended to the `tokenName` when kept in storage (nothing to do with)
+tokenPrefix: 'aurelia', 
+
+
+//OAuth provider specific related configuration
+// ============================================
+providers: {
+  google: {
+    name: 'google',
+    url: '/google',   // api endpoind
+    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
+    redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+    scope: ['profile', 'email'],
+    scopePrefix: 'openid',
+    scopeDelimiter: ' ',
+    requiredUrlParams: ['scope'],
+    optionalUrlParams: ['display'],
+    display: 'popup',
+    type: '2.0',
+    /*clientId: '239531826023-ibk10mb9p7ull54j55a61og5lvnjrff6.apps.googleusercontent.com',*/
+    popupOptions: { width: 452, height: 633 }
+  },
+  facebook: {
+    name: 'facebook',
+    url: '/facebook',
+    authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
+    redirectUri: window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/',
+    scope: ['email'],
+    scopeDelimiter: ',',
+    nonce: function() {
+      return Math.random();
     },
-    facebook: {
-      name: 'facebook',
-      url: '/auth/facebook',
-      authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
-      redirectUri: window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/',
-      scope: ['email'],
-      scopeDelimiter: ',',
-      nonce: function() {
-        return Math.random();
-      },
-      requiredUrlParams: ['nonce','display', 'scope'],
-      display: 'popup',
-      type: '2.0',
-      popupOptions: { width: 580, height: 400 }
-    },
-    linkedin: {
-      name: 'linkedin',
-      url: '/auth/linkedin',
-      authorizationEndpoint: 'https://www.linkedin.com/uas/oauth2/authorization',
-      redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-      requiredUrlParams: ['state'],
-      scope: ['r_emailaddress'],
-      scopeDelimiter: ' ',
-      state: 'STATE',
-      type: '2.0',
-      popupOptions: { width: 527, height: 582 }
-    },
-    github: {
-      name: 'github',
-      url: '/auth/github',
-      authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-      redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-      optionalUrlParams: ['scope'],
-      scope: ['user:email'],
-      scopeDelimiter: ' ',
-      type: '2.0',
-      popupOptions: { width: 1020, height: 618 }
-    },
-    yahoo: {
-      name: 'yahoo',
-      url: '/auth/yahoo',
-      authorizationEndpoint: 'https://api.login.yahoo.com/oauth2/request_auth',
-      redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-      scope: [],
-      scopeDelimiter: ',',
-      type: '2.0',
-      popupOptions: { width: 559, height: 519 }
-    },
-    twitter: {
-      name: 'twitter',
-      url: '/auth/twitter',
-      authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
-      type: '1.0',
-      popupOptions: { width: 495, height: 645 }
-    },
-    live: {
-      name: 'live',
-      url: '/auth/live',
-      authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
-      redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
-      scope: ['wl.emails'],
-      scopeDelimiter: ' ',
-      requiredUrlParams: ['display', 'scope'],
-      display: 'popup',
-      type: '2.0',
-      popupOptions: { width: 500, height: 560 }
-    }
+    requiredUrlParams: ['nonce','display', 'scope'],
+    display: 'popup',
+    type: '2.0',
+    popupOptions: { width: 580, height: 400 }
+  },
+  linkedin: {
+    name: 'linkedin',
+    url: '/linkedin',
+    authorizationEndpoint: 'https://www.linkedin.com/uas/oauth2/authorization',
+    redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+    requiredUrlParams: ['state'],
+    scope: ['r_emailaddress'],
+    scopeDelimiter: ' ',
+    state: 'STATE',
+    type: '2.0',
+    popupOptions: { width: 527, height: 582 }
+  },
+  github: {
+    name: 'github',
+    url: '/github',
+    authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+    redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+    optionalUrlParams: ['scope'],
+    scope: ['user:email'],
+    scopeDelimiter: ' ',
+    type: '2.0',
+    popupOptions: { width: 1020, height: 618 }
+  },
+  yahoo: {
+    name: 'yahoo',
+    url: '/yahoo',
+    authorizationEndpoint: 'https://api.login.yahoo.com/oauth2/request_auth',
+    redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+    scope: [],
+    scopeDelimiter: ',',
+    type: '2.0',
+    popupOptions: { width: 559, height: 519 }
+  },
+  twitter: {
+    name: 'twitter',
+    url: '/twitter',
+    authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
+    type: '1.0',
+    popupOptions: { width: 495, height: 645 }
+  },
+  live: {
+    name: 'live',
+    url: '/live',
+    authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
+    redirectUri: window.location.origin || window.location.protocol + '//' + window.location.host,
+    scope: ['wl.emails'],
+    scopeDelimiter: ' ',
+    requiredUrlParams: ['display', 'scope'],
+    display: 'popup',
+    type: '2.0',
+    popupOptions: { width: 500, height: 560 }
   }
+}
 ```
 
 More non Aurelia specific details can be found on the [Sattelizer Github page](https://github.com/sahat/satellizer/).
