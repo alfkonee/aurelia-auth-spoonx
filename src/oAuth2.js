@@ -1,7 +1,6 @@
 import {inject} from 'aurelia-dependency-injection';
 import {buildQueryString} from 'aurelia-path';
 import extend from 'extend';
-
 import {Storage} from './storage';
 import {Popup} from './popup';
 import {BaseConfig} from './baseConfig';
@@ -41,7 +40,7 @@ export class OAuth2 {
 
     const url       = provider.authorizationEndpoint
                     + '?' + buildQueryString(this.buildQuery(provider));
-    const popup     = this.popup.open(url, provider.name, provider.popupOptions, provider.redirectUri);
+    const popup     = this.popup.open(url, provider.name, provider.popupOptions);
     const openPopup = (this.config.platform === 'mobile')
                     ? popup.eventListener(provider.redirectUri)
                     : popup.pollPopup();
@@ -67,7 +66,7 @@ export class OAuth2 {
       redirectUri: provider.redirectUri
     }, oauthData);
 
-    const serverUrl   = this.config.withBase(provider.url);
+    const serverUrl   = this.config.joinBase(provider.url);
     const credentials = this.config.withCredentials ? 'include' : 'same-origin';
 
     return this.config.client.post(serverUrl, data, {credentials: credentials});

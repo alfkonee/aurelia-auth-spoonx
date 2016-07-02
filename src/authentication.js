@@ -1,39 +1,28 @@
+import {PLATFORM} from 'aurelia-pal';
 import {inject} from 'aurelia-dependency-injection';
 import {deprecated} from 'aurelia-metadata';
+import jwtDecode from 'jwt-decode';
 import * as LogManager from 'aurelia-logging';
-
 import {BaseConfig}  from './baseConfig';
 import {Storage} from './storage';
 import {OAuth1} from './oAuth1';
 import {OAuth2} from './oAuth2';
+import {Auth0Lock} from './auth0Lock';
 
-@inject(Storage, BaseConfig, OAuth1, OAuth2)
+@inject(Storage, BaseConfig, OAuth1, OAuth2, Auth0Lock)
 export class Authentication {
-  constructor(storage, config, oAuth1, oAuth2) {
+  constructor(storage, config, oAuth1, oAuth2, auth0Lock) {
     this.storage              = storage;
     this.config               = config;
     this.oAuth1               = oAuth1;
     this.oAuth2               = oAuth2;
+    this.auth0Lock            = auth0Lock;
     this.updateTokenCallstack = [];
     this.accessToken          = null;
     this.refreshToken         = null;
     this.payload              = null;
     this.exp                  = null;
     this.hasDataStored        = false;
-
-    // get token stored in previous format over
-    const oldStorageKey = config.tokenPrefix
-                        ? config.tokenPrefix + '_' + config.tokenName
-                        : this.tokenName;
-    const oldToken = storage.get(oldStorageKey);
-
-    if (oldToken) {
-      LogManager.getLogger('authentication').info('Found token with deprecated format in storage. Converting it to new format. No further action required.');
-      let fakeOldResponse = {};
-      fakeOldResponse[config.accessTokenProp] = oldToken;
-      this.responseObject = fakeOldResponse;
-      storage.remove(oldStorageKey);
-    }
   }
 
 
@@ -49,19 +38,19 @@ export class Authentication {
     return this.config.loginRedirect;
   }
 
-  @deprecated({message: 'Use baseConfig.withBase(baseConfig.loginUrl) instead.'})
+  @deprecated({message: 'Use baseConfig.joinBase(baseConfig.loginUrl) instead.'})
   getLoginUrl() {
-    return this.config.withBase(this.config.loginUrl);
+    return this.Config.joinBase(this.config.loginUrl);
   }
 
-  @deprecated({message: 'Use baseConfig.withBase(baseConfig.signupUrl) instead.'})
+  @deprecated({message: 'Use baseConfig.joinBase(baseConfig.signupUrl) instead.'})
   getSignupUrl() {
-    return this.config.withBase(this.config.signupUrl);
+    return this.Config.joinBase(this.config.signupUrl);
   }
 
-  @deprecated({message: 'Use baseConfig.withBase(baseConfig.profileUrl) instead.'})
+  @deprecated({message: 'Use baseConfig.joinBase(baseConfig.profileUrl) instead.'})
   getProfileUrl() {
-    return this.config.withBase(this.config.profileUrl);
+    return this.Config.joinBase(this.config.profileUrl);
   }
 
   @deprecated({message: 'Use .getAccessToken() instead.'})
@@ -69,41 +58,58 @@ export class Authentication {
     return this.getAccessToken();
   }
 
-  /* getters/setters for responseObject */
-
   get responseObject() {
-    return JSON.parse(this.storage.get(this.config.storageKey));
+    LogManager.getLogger('authentication').warn('Getter Authentication.responseObject is deprecated. Use Authentication.getResponseObject() instead.');
+    return this.getResponseObject();
   }
 
   set responseObject(response) {
+    LogManager.getLogger('authentication').warn('Setter Authentication.responseObject is deprecated. Use AuthServive.setResponseObject(response) instead.');
+    this.setResponseObject(response);
+  }
+
+  /* get/set responseObject */
+
+  getResponseObject() {
+    return JSON.parse(this.storage.get(this.config.storageKey));
+  }
+
+  setResponseObject(response) {
     if (response) {
       this.getDataFromResponse(response);
-      return this.storage.set(this.config.storageKey, JSON.stringify(response));
+      this.storage.set(this.config.storageKey, JSON.stringify(response));
+      return;
     }
-    this.deleteData();
-    return this.storage.remove(this.config.storageKey);
+    this.accessToken = null;
+    this.refreshToken = null;
+    this.payload = null;
+    this.exp = null;
+
+    this.hasDataStored = false;
+
+    this.storage.remove(this.config.storageKey);
   }
 
 
   /* get data, update if needed first */
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.responseObject);
+    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.responseObject);
+    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.responseObject);
+    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.responseObject);
+    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -143,19 +149,13 @@ export class Authentication {
       }
     }
 
-    let payload = null;
+    this.payload = null;
 
-    if (this.accessToken && this.accessToken.split('.').length === 3) {
-      try {
-        const base64 = this.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        payload = JSON.parse(decodeURIComponent(escape(window.atob(base64))));
-      } catch (e) {
-        payload = null;
-      }
-    }
+    try {
+      this.payload = this.accessToken ? jwtDecode(this.accessToken) : null;
+    } catch (_) {_;}
 
-    this.payload = payload;
-    this.exp = payload ? parseInt(payload.exp, 10) : NaN;
+    this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
 
     this.hasDataStored = true;
 
@@ -167,27 +167,22 @@ export class Authentication {
     };
   }
 
-  deleteData() {
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.payload = null;
-    this.exp = null;
-
-    this.hasDataStored = false;
-  }
-
   getTokenFromResponse(response, tokenProp, tokenName, tokenRoot) {
     if (!response) return undefined;
 
-    const responseTokenProp = response[tokenProp];
+    const responseTokenProp = tokenProp.split('.').reduce((o, x) => o[x], response);
 
     if (typeof responseTokenProp === 'string') {
       return responseTokenProp;
     }
 
     if (typeof responseTokenProp === 'object') {
-      const tokenRootData = tokenRoot && tokenRoot.split('.').reduce(function(o, x) { return o[x]; }, responseTokenProp);
-      return tokenRootData ? tokenRootData[tokenName] : responseTokenProp[tokenName];
+      const tokenRootData = tokenRoot && tokenRoot.split('.').reduce((o, x) => o[x], responseTokenProp);
+      const token = tokenRootData ? tokenRootData[tokenName] : responseTokenProp[tokenName];
+
+      if (!token) throw new Error('Token not found in response');
+
+      return token;
     }
 
     const token = response[tokenName] === undefined ? null : response[tokenName];
@@ -217,9 +212,22 @@ export class Authentication {
    * @return {Promise<response>}
    */
   authenticate(name, userData = {}) {
-    const provider = this.config.providers[name].type === '1.0' ? this.oAuth1 : this.oAuth2;
+    let oauthType = this.config.providers[name].type;
 
-    return provider.open(this.config.providers[name], userData);
+    if (oauthType) {
+      LogManager.getLogger('authentication').warn('DEPRECATED: Setting provider.type is deprecated and replaced by provider.oauthType');
+    } else {
+      oauthType = this.config.providers[name].oauthType;
+    }
+
+    let providerLogin;
+    if (oauthType === 'auth0-lock') {
+      providerLogin = this.auth0Lock;
+    } else {
+      providerLogin = (oauthType === '1.0' ? this.oAuth1 : this.oAuth2);
+    }
+
+    return providerLogin.open(this.config.providers[name], userData);
   }
 
   redirect(redirectUrl, defaultRedirectUrl) {
@@ -237,9 +245,9 @@ export class Authentication {
       return;
     }
     if (typeof redirectUrl === 'string') {
-      window.location.href = window.encodeURI(redirectUrl);
+      PLATFORM.location.href = encodeURI(redirectUrl);
     } else if (defaultRedirectUrl) {
-      window.location.href = defaultRedirectUrl;
+      PLATFORM.location.href = defaultRedirectUrl;
     }
   }
 }

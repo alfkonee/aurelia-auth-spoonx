@@ -93,6 +93,7 @@ describe('OAuth2', () => {
           expect(res.path).toBe('/auth/facebook');
           expect(res.body.access_token).toBe('someToken');
           expect(res.body.userData).toBe('some');
+          expect(popup.url).toBe('https://www.facebook.com/v2.5/dialog/oauth?display=popup&redirect_uri=http%3A%2F%2Flocalhost%3A9876%2F&response_type=code&scope=email');
 
           done();
         })
@@ -107,7 +108,6 @@ describe('OAuth2', () => {
   describe('.buildQuery()', () => {
     it('return query', () => {
       const query = oAuth2.buildQuery(baseConfig.providers['facebook']);
-      expect(query.nonce).toMatch(/.\d/);
       expect(query.display).toBe('popup');
       expect(query.scope).toBe('email');
     });

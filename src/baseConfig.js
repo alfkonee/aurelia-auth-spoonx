@@ -1,14 +1,23 @@
+import {PLATFORM} from 'aurelia-pal';
 import {join} from 'aurelia-path';
 import extend from 'extend';
 import * as LogManager from 'aurelia-logging';
 
 export class BaseConfig {
-  // prepends baseUrl
-  withBase(url) {
+  /**
+   * Prepends baseUrl to a given url
+   * @param  {String} url The relative url to append
+   * @return {String}     joined baseUrl and url
+   */
+  joinBase(url) {
     return join(this.baseUrl, url);
   }
 
-  // merge current settings with incomming settings
+  /**
+   * Merge current settings with incomming settings
+   * @param  {Object} incomming Settings object to be merged into the current configuration
+   * @return {Config}           this
+   */
   configure(incomming) {
     for (let key in incomming) {
       const value = incomming[key];
@@ -40,7 +49,7 @@ export class BaseConfig {
   // ===================
 
   // The SPA url to which the user is redirected after a successful login
-  loginRedirect = '#/customer';
+  loginRedirect = '#/';
   // The SPA url to which the user is redirected after a successful logout
   logoutRedirect = '#/';
   // The SPA route used when an unauthenticated user tries to access an SPA page that requires authentication
@@ -49,6 +58,8 @@ export class BaseConfig {
   loginOnSignup = true;
   // If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
   signupRedirect = '#/login';
+  // redirect  when token expires. 0 = don't redirect (default), 1 = use logoutRedirect, string = redirect there
+  expiredRedirect = 0;
 
 
   // API related options
@@ -59,14 +70,22 @@ export class BaseConfig {
   baseUrl = '';
   // The API endpoint to which login requests are sent
   loginUrl = '/auth/login';
+  // The API endpoint to which logout requests are sent (not needed for jwt)
+  logoutUrl = null;
+  // The HTTP method used for 'unlink' requests (Options: 'get' or 'post')
+  logoutMethod = 'get';
   // The API endpoint to which signup requests are sent
   signupUrl = '/auth/signup';
   // The API endpoint used in profile requests (inc. `find/get` and `update`)
   profileUrl = '/auth/me';
+  // The method used to update the profile ('put' or 'patch')
+  profileMethod = 'put';
   // The API endpoint used with oAuth to unlink authentication
   unlinkUrl = '/auth/unlink/';
   // The HTTP method used for 'unlink' requests (Options: 'get' or 'post')
   unlinkMethod = 'get';
+  // The API endpoint to which refreshToken requests are sent. null = loginUrl
+  refreshTokenUrl = null;
 
 
   // Token Options
@@ -76,7 +95,7 @@ export class BaseConfig {
   authHeader = 'Authorization';
   // The token name used in the header of API requests that require authentication
   authTokenType = 'Bearer';
-  // The the property from which to get the access token after a successful login or signup
+  // The the property from which to get the access token after a successful login or signup. Can also be dotted eg "accessTokenProp.accessTokenName"
   accessTokenProp = 'access_token';
 
 
@@ -98,7 +117,7 @@ export class BaseConfig {
   autoUpdateToken = true;
   // Oauth Client Id
   clientId = false;
-  // The the property from which to get the refresh token after a successful token refresh
+  // The the property from which to get the refresh token after a successful token refresh. Can also be dotted eg "refreshTokenProp.refreshTokenProp"
   refreshTokenProp = 'refresh_token';
 
   // If the property defined by `refreshTokenProp` is an object:
@@ -120,130 +139,141 @@ export class BaseConfig {
   withCredentials = true;
   // Controls how the popup is shown for different devices (Options: 'browser' or 'mobile')
   platform = 'browser';
-  // Determines the `window` property name upon which aurelia-authentication data is stored (Default: `window.localStorage`)
+  // Determines the `PLATFORM` property name upon which aurelia-authentication data is stored (Default: `PLATFORM.localStorage`)
   storage = 'localStorage';
   // The key used for storing the authentication response locally
   storageKey = 'aurelia_authentication';
 
-  //OAuth provider specific related configuration
+  // List of value-converters to make global
+  globalValueConverters = ['authFilterValueConverter'];
+
+//OAuth provider specific related configuration
   // ============================================
   providers = {
+    facebook: {
+      name: 'facebook',
+      url: '/auth/facebook',
+      authorizationEndpoint: 'https://www.facebook.com/v2.5/dialog/oauth',
+      redirectUri: PLATFORM.location.origin + '/',
+      requiredUrlParams: ['display', 'scope'],
+      scope: ['email'],
+      scopeDelimiter: ',',
+      display: 'popup',
+      oauthType: '2.0',
+      popupOptions: { width: 580, height: 400 }
+    },
     google: {
       name: 'google',
       url: '/auth/google',
       authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
+      redirectUri: PLATFORM.location.origin,
+      requiredUrlParams: ['scope'],
+      optionalUrlParams: ['display', 'state'],
       scope: ['profile', 'email'],
       scopePrefix: 'openid',
       scopeDelimiter: ' ',
-      requiredUrlParams: ['scope'],
-      optionalUrlParams: ['display'],
       display: 'popup',
-      type: '2.0',
-      popupOptions: {
-        width: 452,
-        height: 633
-      }
-    },
-    facebook: {
-      name: 'facebook',
-      url: '/auth/facebook',
-      authorizationEndpoint: 'https://www.facebook.com/v2.3/dialog/oauth',
-      redirectUri: encodeURI(window.location.origin + '/' || window.location.protocol + '//' + window.location.host + '/'),
-      scope: ['email'],
-      scopeDelimiter: ',',
-      nonce: function() {
-        return Math.random();
-      },
-      requiredUrlParams: ['nonce', 'display', 'scope'],
-      display: 'popup',
-      type: '2.0',
-      popupOptions: {
-        width: 580,
-        height: 400
-      }
-    },
-    linkedin: {
-      name: 'linkedin',
-      url: '/auth/linkedin',
-      authorizationEndpoint: 'https://www.linkedin.com/uas/oauth2/authorization',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
-      requiredUrlParams: ['state'],
-      scope: ['r_emailaddress'],
-      scopeDelimiter: ' ',
-      state: 'STATE',
-      type: '2.0',
-      popupOptions: {
-        width: 527,
-        height: 582
-      }
+      oauthType: '2.0',
+      popupOptions: { width: 452, height: 633 },
+      state: randomState
     },
     github: {
       name: 'github',
       url: '/auth/github',
       authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
+      redirectUri: PLATFORM.location.origin,
       optionalUrlParams: ['scope'],
       scope: ['user:email'],
       scopeDelimiter: ' ',
-      type: '2.0',
-      popupOptions: {
-        width: 1020,
-        height: 618
-      }
-    },
-    yahoo: {
-      name: 'yahoo',
-      url: '/auth/yahoo',
-      authorizationEndpoint: 'https://api.login.yahoo.com/oauth2/request_auth',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
-      scope: [],
-      scopeDelimiter: ',',
-      type: '2.0',
-      popupOptions: {
-        width: 559,
-        height: 519
-      }
-    },
-    twitter: {
-      name: 'twitter',
-      url: '/auth/twitter',
-      authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
-      type: '1.0',
-      popupOptions: {
-        width: 495,
-        height: 645
-      }
-    },
-    live: {
-      name: 'live',
-      url: '/auth/live',
-      authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
-      scope: ['wl.emails'],
-      scopeDelimiter: ' ',
-      requiredUrlParams: ['display', 'scope'],
-      display: 'popup',
-      type: '2.0',
-      popupOptions: {
-        width: 500,
-        height: 560
-      }
+      oauthType: '2.0',
+      popupOptions: { width: 1020, height: 618 }
     },
     instagram: {
       name: 'instagram',
       url: '/auth/instagram',
       authorizationEndpoint: 'https://api.instagram.com/oauth/authorize',
-      redirectUri: encodeURI(window.location.origin || window.location.protocol + '//' + window.location.host),
+      redirectUri: PLATFORM.location.origin,
       requiredUrlParams: ['scope'],
       scope: ['basic'],
       scopeDelimiter: '+',
+      oauthType: '2.0'
+    },
+    linkedin: {
+      name: 'linkedin',
+      url: '/auth/linkedin',
+      authorizationEndpoint: 'https://www.linkedin.com/uas/oauth2/authorization',
+      redirectUri: PLATFORM.location.origin,
+      requiredUrlParams: ['state'],
+      scope: ['r_emailaddress'],
+      scopeDelimiter: ' ',
+      state: 'STATE',
+      oauthType: '2.0',
+      popupOptions: { width: 527, height: 582 }
+    },
+    twitter: {
+      name: 'twitter',
+      url: '/auth/twitter',
+      authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
+      redirectUri: PLATFORM.location.origin,
+      oauthType: '1.0',
+      popupOptions: { width: 495, height: 645 }
+    },
+    twitch: {
+      name: 'twitch',
+      url: '/auth/twitch',
+      authorizationEndpoint: 'https://api.twitch.tv/kraken/oauth2/authorize',
+      redirectUri: PLATFORM.location.origin,
+      requiredUrlParams: ['scope'],
+      scope: ['user_read'],
+      scopeDelimiter: ' ',
       display: 'popup',
-      type: '2.0',
-      popupOptions: {
-        width: 550,
-        height: 369
-      }
+      oauthType: '2.0',
+      popupOptions: { width: 500, height: 560 }
+    },
+    live: {
+      name: 'live',
+      url: '/auth/live',
+      authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
+      redirectUri: PLATFORM.location.origin,
+      requiredUrlParams: ['display', 'scope'],
+      scope: ['wl.emails'],
+      scopeDelimiter: ' ',
+      display: 'popup',
+      oauthType: '2.0',
+      popupOptions: { width: 500, height: 560 }
+    },
+    yahoo: {
+      name: 'yahoo',
+      url: '/auth/yahoo',
+      authorizationEndpoint: 'https://api.login.yahoo.com/oauth2/request_auth',
+      redirectUri: PLATFORM.location.origin,
+      scope: [],
+      scopeDelimiter: ',',
+      oauthType: '2.0',
+      popupOptions: { width: 559, height: 519 }
+    },
+    bitbucket: {
+      name: 'bitbucket',
+      url: '/auth/bitbucket',
+      authorizationEndpoint: 'https://bitbucket.org/site/oauth2/authorize',
+      redirectUri: PLATFORM.location.origin + '/',
+      requiredUrlParams: ['scope'],
+      scope: ['email'],
+      scopeDelimiter: ' ',
+      oauthType: '2.0',
+      popupOptions: { width: 1028, height: 529 }
+    },
+    auth0: {
+      name: 'auth0',
+      oauthType: 'auth0-lock',
+      clientId: 'your_client_id',
+      clientDomain: 'your_domain_url',
+      display: 'popup',
+      lockOptions: {
+        popup: true
+      },
+      responseType: 'token',
+      state: randomState
     }
   };
 
@@ -255,11 +285,6 @@ export class BaseConfig {
   _tokenPrefix = 'aurelia';
 
   /* deprecated methods and parameteres */
-  get current() {
-    LogManager.getLogger('authentication').warn('BaseConfig.current() is deprecated. Use BaseConfig directly instead.');
-    return this;
-  }
-
   set authToken(authToken) {
     LogManager.getLogger('authentication').warn('BaseConfig.authToken is deprecated. Use BaseConfig.authTokenType instead.');
     this._authTokenType = authToken;
@@ -308,4 +333,25 @@ export class BaseConfig {
   get tokenPrefix() {
     return this._tokenPrefix || 'aurelia';
   }
+
+  get current() {
+    LogManager.getLogger('authentication').warn('Getter BaseConfig.current is deprecated. Use BaseConfig directly instead.');
+    return this;
+  }
+  set current(_) {
+    throw new Error('Setter BaseConfig.current is obsolete. Use BaseConfig directly instead.');
+  }
+
+  get _current() {
+    LogManager.getLogger('authentication').warn('Getter BaseConfig._current is deprecated. Use BaseConfig directly instead.');
+    return this;
+  }
+  set _current(_) {
+    throw new Error('Setter BaseConfig._current is obsolete. Use BaseConfig directly instead.');
+  }
+}
+
+function randomState() {
+  let rand = Math.random().toString(36).substr(2);
+  return encodeURIComponent(rand);
 }

@@ -1,7 +1,6 @@
-import {HttpClient} from 'aurelia-fetch-client';
 import {inject} from 'aurelia-dependency-injection';
+import {HttpClient} from 'aurelia-fetch-client';
 import {Config, Rest} from 'aurelia-api';
-
 import {AuthService} from './authService';
 import {BaseConfig} from './baseConfig';
 
@@ -77,7 +76,7 @@ export class FetchConfig {
   /**
    * Configure client(s) with authorization interceptor
    *
-   * @param {HttpClient|Rest|string[]} (array of) httpClient, rest client or api endpoint names
+   * @param {HttpClient|Rest|string[]} client HttpClient, rest client or api endpoint name, or an array thereof
    *
    * @return {HttpClient[]}
    */

@@ -3,8 +3,16 @@ import {Config, Rest} from 'aurelia-api';
 
 import {configure} from '../src/aurelia-authentication';
 import {AuthService} from '../src/aurelia-authentication';
-import {BaseConfig} from '../src/baseConfig';
 import {Authentication} from '../src/authentication';
+
+const tokenFuture = {
+  payload: {
+    name: 'tokenFuture',
+    admin: true,
+    exp: '2460017154'
+  },
+  jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoidG9rZW5GdXR1cmUiLCJhZG1pbiI6dHJ1ZSwiZXhwIjoiMjQ2MDAxNzE1NCJ9.iHXLzWGY5U9WwVT4IVRLuKTf65XpgrA1Qq_Jlynv6bc'
+};
 
 const noop = () => {};
 
@@ -30,9 +38,26 @@ function getContainer() {
 
 
 describe('AuthService', () => {
+  describe('.constructor()', () => {
+    const container = new Container();
+
+    afterEach(() => {
+      container.get(Authentication).setResponseObject(null);
+    });
+
+    it('should return old accessToken and delete in storage', () => {
+      window.localStorage.setItem('aurelia_token', 'old one');
+
+      const authService = container.get(AuthService);
+      const token = authService.getAccessToken();
+
+      expect(token).toBe('old one');
+    });
+  });
+
   describe('.client', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
     it('to be instanceof HttpClient', () => {
       expect(authService.client instanceof Rest).toBe(true);
     });
@@ -40,8 +65,8 @@ describe('AuthService', () => {
 
 
   describe('.getMe()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('without criteria', done => {
       authService.getMe()
@@ -84,9 +109,13 @@ describe('AuthService', () => {
   });
 
 
-  describe('.updateMe()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+  describe('.updateMe() with PUT', () => {
+    const container   = getContainer();
+    const authService = container.get(AuthService);
+
+    beforeEach(() => {
+      authService.config.profileMethod = 'put';
+    });
 
     it('without criteria', done => {
       authService.updateMe({data: 'some'})
@@ -134,12 +163,178 @@ describe('AuthService', () => {
   });
 
 
+  describe('.updateMe() with PATCH', () => {
+    const container   = getContainer();
+    const authService = container.get(AuthService);
+
+    beforeEach(() => {
+      authService.config.profileMethod = 'patch';
+    });
+
+    it('without criteria', done => {
+      authService.updateMe({data: 'some'})
+        .then(result => {
+          expect(result.method).toBe('PATCH');
+          expect(result.path).toBe('/auth/me');
+          expect(JSON.stringify(result.query)).toBe('{}');
+          expect(result.body.data).toBe('some');
+          done();
+        });
+    });
+
+    it('with criteria a number', done => {
+      authService.updateMe({data: 'some'}, 5)
+        .then(result => {
+          expect(result.method).toBe('PATCH');
+          expect(result.path).toBe('/auth/me');
+          expect(result.query.id).toBe('5');
+          expect(result.body.data).toBe('some');
+          done();
+        });
+    });
+
+    it('with criteria a string', done => {
+      authService.updateMe({data: 'some'}, 'five')
+        .then(result => {
+          expect(result.method).toBe('PATCH');
+          expect(result.path).toBe('/auth/me');
+          expect(result.query.id).toBe('five');
+          expect(result.body.data).toBe('some');
+          done();
+        });
+    });
+
+    it('with criteria an object', done => {
+      authService.updateMe({data: 'some'}, {foo: 'bar'})
+        .then(result => {
+          expect(result.method).toBe('PATCH');
+          expect(result.path).toBe('/auth/me');
+          expect(result.query.foo).toBe('bar');
+          expect(result.body.data).toBe('some');
+          done();
+        });
+    });
+  });
+
+
+  describe('.setTimeout()', () => {
+    const container = new Container();
+    let authService = container.get(AuthService);
+
+    it('Should set instant timeout', done => {
+      let timeoutID = authService.timeoutID;
+      authService.setTimeout(0);
+
+      expect(authService.timeoutID).not.toBe(timeoutID);
+
+      setTimeout(done, 1);
+    });
+
+    it('Should have timed out', () => {
+      expect(authService.timeoutID).toBe(0);
+    });
+
+    it('Should set longer timeout', done => {
+      let timeoutID = authService.timeoutID;
+      authService.setTimeout(10000);
+
+      expect(authService.timeoutID).not.toBe(timeoutID);
+
+      setTimeout(done, 10);
+    });
+
+    it('Should not have timeeout', () => {
+      expect(authService.timeoutID).not.toBe(0);
+    });
+
+    it('Should clear timeout', () => {
+      authService.clearTimeout();
+      expect(authService.timeoutID).toBe(0);
+    });
+  });
+
+
+  describe('.setResponseObject()', () => {
+    const container = new Container();
+    let authService = container.get(AuthService);
+
+    authService.getTtl = () => 0;
+
+    it('Should set with object', () => {
+      authService.setResponseObject({access_token: 'some'});
+
+      expect(JSON.parse(window.localStorage.getItem('aurelia_authentication')).access_token).toBe('some');
+      expect(authService.authenticated).toBe(true);
+
+      authService.setResponseObject(null);
+    });
+
+    it('Should set with jwt and not timeout', done => {
+      spyOn(authService, 'getTtl').and.returnValue(1);
+      spyOn(authService.authentication, 'redirect').and.callThrough();
+
+      authService.setResponseObject({access_token: tokenFuture.jwt});
+
+      expect(JSON.parse(window.localStorage.getItem('aurelia_authentication')).access_token).toBe(tokenFuture.jwt);
+      expect(authService.authenticated).toBe(true);
+
+      setTimeout(() => {
+        expect(authService.authenticated).toBe(true);
+        authService.logout().then(done);
+      }, 1);
+    });
+
+    it('Should set with jwt and timeout', done => {
+      spyOn(authService, 'getTtl').and.returnValue(0);
+      spyOn(authService.authentication, 'redirect').and.callFake((overwriteUri, defaultUri) => {
+        expect(overwriteUri).toBe(0);
+        expect(defaultUri).toBe(authService.config.logoutRedirect);
+
+        expect(authService.authenticated).toBe(false);
+        done();
+      });
+
+      authService.setResponseObject({access_token: tokenFuture.jwt});
+
+      expect(JSON.parse(window.localStorage.getItem('aurelia_authentication')).access_token).toBe(tokenFuture.jwt);
+      expect(authService.authenticated).toBe(true);
+    });
+
+    it('Should set with jwt,  timeout and redirect', done => {
+      spyOn(authService, 'getTtl').and.returnValue(0);
+      spyOn(authService.authentication, 'redirect').and.callFake((overwriteUri, defaultUri) => {
+        expect(overwriteUri).toBe(1);
+        expect(defaultUri).toBe(authService.config.logoutRedirect);
+
+        expect(authService.authenticated).toBe(false);
+        done();
+      });
+
+      authService.setResponseObject({access_token: tokenFuture.jwt});
+      authService.config.expiredRedirect = 1;
+
+      expect(JSON.parse(window.localStorage.getItem('aurelia_authentication')).access_token).toBe(tokenFuture.jwt);
+      expect(authService.authenticated).toBe(true);
+    });
+
+    it('Should delete', () => {
+      window.localStorage.setItem('aurelia_authentication', 'another');
+
+      authService.setResponseObject(null);
+      expect(window.localStorage.getItem('aurelia_authentication')).toBe(null);
+      expect(authService.authenticated).toBe(false);
+
+      authService.authentication.setResponseObject(null);
+    });
+  });
+
+
   describe('.getAccessToken()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('should return authentication.accessToken', () => {
-      authService.authentication.responseObject = {token: 'some'};
+      authService.setResponseObject({token: 'some'});
 
       const token = authService.getAccessToken();
 
@@ -149,12 +344,12 @@ describe('AuthService', () => {
 
 
   describe('.getRefreshToken()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('should return authentication.refreshToken', () => {
       authService.config.useRefreshToken = true;
-      authService.authentication.responseObject = {token: 'some', refresh_token: 'another'};
+      authService.setResponseObject({token: 'some', refresh_token: 'another'});
 
       expect(authService.getRefreshToken()).toBe('another');
       authService.config.useRefreshToken = false;
@@ -162,14 +357,17 @@ describe('AuthService', () => {
   });
 
   describe('.isAuthenticated()', () => {
-    const container      = getContainer();
-    const authentication = container.get(Authentication);
-    const baseConfig     = container.get(BaseConfig);
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
+    beforeEach(() => {
+      authService.config.useRefreshToken = true;
+      authService.config.autoUpdateToken = true;
+    });
     afterEach(done => {
+      authService.config.useRefreshToken = false;
+      authService.config.autoUpdateToken = false;
       authService.logout().then(done);
-      baseConfig.autoUpdateToken = false;
     });
 
     it('should return boolean', () => {
@@ -180,12 +378,10 @@ describe('AuthService', () => {
 
     describe('with autoUpdateToken=true', () => {
       it('should return boolean true', () => {
-        authService.config.useRefreshToken = true;
-        baseConfig.autoUpdateToken  = true;
-        authService.authentication.responseObject = {token: 'some', refresh_token: 'another'};
+        authService.setResponseObject({token: 'some', refresh_token: 'another'});
 
         spyOn(authService, 'updateToken').and.returnValue(Promise.resolve(false));
-        spyOn(authentication, 'isAuthenticated').and.returnValue(false);
+        spyOn(authService.authentication, 'isAuthenticated').and.returnValue(false);
 
         const result = authService.isAuthenticated();
 
@@ -196,8 +392,8 @@ describe('AuthService', () => {
   });
 
   describe('.getTtl()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('should return authentication.getTtl() result', () => {
       spyOn(authService.authentication, 'getTtl').and.returnValue('any');
@@ -210,8 +406,8 @@ describe('AuthService', () => {
 
 
   describe('.isTokenExpired()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('should return authentication.isTokenExpired() result', () => {
       spyOn(authService.authentication, 'isTokenExpired').and.returnValue('expired');
@@ -224,8 +420,8 @@ describe('AuthService', () => {
 
 
   describe('.getTokenPayload()', () => {
-    const container      = getContainer();
-    const authService    = container.get(AuthService);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
     it('should return authentication.getTokenPayload() result ', () => {
       spyOn(authService.authentication, 'getPayload').and.returnValue('payload');
@@ -238,11 +434,14 @@ describe('AuthService', () => {
 
 
   describe('.updateToken()', () => {
-    const container      = new Container();
+    const container   = new Container();
     const authService = container.get(AuthService);
-    authService.config.useRefreshToken = true;
 
+    afterEach(() => {
+      authService.config.useRefreshToken = true;
+    });
     afterEach(done => {
+      authService.config.useRefreshToken = false;
       authService.logout().then(done);
     });
 
@@ -291,7 +490,7 @@ describe('AuthService', () => {
     });
 
     it('get new accessToken', done => {
-      authService.authentication.responseObject = {token: 'some', refresh_token: 'another'};
+      authService.setResponseObject({token: 'some', refresh_token: 'another'});
       authService.config.client = {
         post: () => Promise.resolve({token: 'newToken'})
       };
@@ -306,7 +505,7 @@ describe('AuthService', () => {
     });
 
     it('get same new accessToken if called several times', done => {
-      authService.authentication.responseObject = {token: 'some', refresh_token: 'another'};
+      authService.setResponseObject({token: 'some', refresh_token: 'another'});
       authService.config.client = {
         post: () => Promise.resolve({token: 'newToken'})
       };
@@ -336,6 +535,9 @@ describe('AuthService', () => {
     const container = getContainer();
     const authService = container.get(AuthService);
 
+    beforeEach(done => {
+      authService.logout().then(done);
+    });
     afterEach(done => {
       authService.logout().then(done);
     });
@@ -403,6 +605,9 @@ describe('AuthService', () => {
     const container = getContainer();
     const authService = container.get(AuthService);
 
+    beforeEach(done => {
+      authService.logout().then(done);
+    });
     afterEach(done => {
       authService.logout().then(done);
     });
@@ -446,17 +651,37 @@ describe('AuthService', () => {
 
 
   describe('.logout()', () => {
-    const container      = getContainer();
+    const container   = getContainer();
     const authService = container.get(AuthService);
 
-    authService.authentication.responseObject = {token: 'some', refresh_token: 'another'};
-    authService.config.logoutRedirect = 'nowhere';
+    beforeEach(() => {
+      authService.setResponseObject({token: 'some', refresh_token: 'another'});
+      authService.config.logoutRedirect = 'nowhere';
+    });
+
+    afterEach(() => {
+      authService.config.logoutRedirect = null;
+      authService.config.logoutUrl = null;
+    });
 
     it('Should logout and not redirect.', done => {
       authService.logout(0)
         .then(() => {
           expect(authService.isAuthenticated()).toBe(false);
-          authService.config.logoutRedirect = null;
+
+          done();
+        });
+    });
+
+    it('Should send logout request and not redirect.', done => {
+      authService.config.logoutUrl = '/auth/logout';
+
+      authService.logout(0)
+        .then(response => {
+          expect(authService.isAuthenticated()).toBe(false);
+          expect(response.path).toBe('/auth/logout');
+          expect(response.method).toBe('GET');
+
           done();
         });
     });
@@ -464,36 +689,33 @@ describe('AuthService', () => {
 
 
   describe('.authenticate()', () => {
-    const container      = getContainer();
-    const authentication = container.get(Authentication);
-    const baseConfig     = container.get(BaseConfig);
+    const container   = getContainer();
+    const authService = container.get(AuthService);
 
-    authentication.oAuth1.open = (provider, userData) => Promise.resolve({
+    authService.authentication.oAuth1.open = (provider, userData) => Promise.resolve({
       provider: provider,
       userData: userData,
       access_token: 'oauth1'
     });
 
-    authentication.oAuth2.open = (provider, userData) => Promise.resolve({
+    authService.authentication.oAuth2.open = (provider, userData) => Promise.resolve({
       provider: provider,
       userData: userData,
       access_token: 'oauth2'
     });
 
     afterEach(done => {
-      const authService = container.get(AuthService);
       authService.config.loginRedirect = null;
       authService.logout().then(done);
     });
 
     it('Should authenticate with oAuth1 provider, login and not redirect.', done => {
-      const authService = new AuthService(authentication, baseConfig);
-      spyOn(authentication.oAuth1, 'open').and.callThrough();
+      spyOn(authService.authentication.oAuth1, 'open').and.callThrough();
       authService.config.loginRedirect = 'nowhere';
 
       authService.authenticate('twitter', 0, {data: 'some'})
         .then(response => {
-          expect(response.provider).toBe(baseConfig.providers['twitter']);
+          expect(response.provider).toBe(authService.config.providers['twitter']);
           expect(response.userData.data).toBe('some');
           expect(response.access_token).toBe('oauth1');
 
@@ -504,13 +726,12 @@ describe('AuthService', () => {
     });
 
     it('Should authenticate with oAuth2 provider, login and not redirect.', done => {
-      const authService = new AuthService(authentication, baseConfig);
-      spyOn(authentication.oAuth2, 'open').and.callThrough();
+      spyOn(authService.authentication.oAuth2, 'open').and.callThrough();
       authService.config.loginRedirect = null;
 
       authService.authenticate('facebook', null, {data: 'some'})
         .then(response => {
-          expect(response.provider).toBe(baseConfig.providers['facebook']);
+          expect(response.provider).toBe(authService.config.providers['facebook']);
           expect(response.userData.data).toBe('some');
           expect(response.access_token).toBe('oauth2');
 
@@ -521,8 +742,7 @@ describe('AuthService', () => {
     });
 
     it('Should try to authenticate and fail.', done => {
-      const authService = new AuthService(authentication, baseConfig);
-      spyOn(authentication.oAuth2, 'open').and.returnValue(Promise.resolve({error: 'any'}));
+      spyOn(authService.authentication.oAuth2, 'open').and.returnValue(Promise.resolve({error: 'any'}));
 
       authService.authenticate('facebook')
         .catch(error => {
@@ -536,7 +756,7 @@ describe('AuthService', () => {
 
 
   describe('.unlink()', () => {
-    const container = getContainer();
+    const container   = getContainer();
     const authService = container.get(AuthService);
 
     it('Should unlink provider.', done => {

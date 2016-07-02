@@ -1,21 +1,18 @@
 import {inject} from 'aurelia-dependency-injection';
 import {Redirect} from 'aurelia-router';
-import * as LogManager from 'aurelia-logging';
 import {AuthService} from './authService';
 
 @inject(AuthService)
-export class AuthorizeStep {
+export class AuthenticateStep {
   constructor(authService) {
-    LogManager.getLogger('authentication').warn('AuthorizeStep is deprecated. Use AuthenticationStep instead.');
-
     this.authService = authService;
   }
 
   run(routingContext, next) {
-    const isLoggedIn = this.authService.isAuthenticated();
+    const isLoggedIn = this.authService.authenticated;
     const loginRoute = this.authService.config.loginRoute;
 
-    if (routingContext.getAllInstructions().some(route => route.config.auth)) {
+    if (routingContext.getAllInstructions().some(route => route.config.auth === true)) {
       if (!isLoggedIn) {
         return next.cancel(new Redirect(loginRoute));
       }

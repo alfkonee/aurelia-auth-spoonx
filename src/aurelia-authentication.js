@@ -1,11 +1,14 @@
+import {PLATFORM} from 'aurelia-pal';
 import {HttpClient} from 'aurelia-fetch-client';
 import {Config, Rest} from 'aurelia-api';
-
 import {AuthService} from './authService';
 import {AuthorizeStep} from './authorizeStep';
+import {AuthenticateStep} from './authenticateStep';
 import {BaseConfig} from './baseConfig';
 import {FetchConfig} from './fetchClientConfig';
-import './authFilter';
+import * as LogManager from 'aurelia-logging';
+// import to ensure value-converters get bundled
+import './authFilterValueConverter';
 
 /**
  * Configure the plugin.
@@ -14,7 +17,10 @@ import './authFilter';
  * @param {{}|Function}                                         config
  */
 function configure(aurelia, config) {
-  aurelia.globalResources('./authFilter');
+  // ie9 polyfill
+  if (!PLATFORM.location.origin) {
+    PLATFORM.location.origin = PLATFORM.location.protocol + '//' + PLATFORM.location.hostname + (PLATFORM.location.port ? ':' + PLATFORM.location.port : '');
+  }
 
   const baseConfig = aurelia.container.get(BaseConfig);
 
@@ -23,7 +29,12 @@ function configure(aurelia, config) {
   } else if (typeof config === 'object') {
     baseConfig.configure(config);
   }
+
   // after baseConfig was configured
+  for (let converter of baseConfig.globalValueConverters) {
+    aurelia.globalResources(`./${converter}`);
+    LogManager.getLogger('authentication').info(`Add globalResources value-converter: ${converter}`);
+  }
   const fetchConfig  = aurelia.container.get(FetchConfig);
   const clientConfig = aurelia.container.get(Config);
 
@@ -62,5 +73,6 @@ export {
   configure,
   FetchConfig,
   AuthService,
-  AuthorizeStep
+  AuthorizeStep,
+  AuthenticateStep
 };

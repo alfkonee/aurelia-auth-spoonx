@@ -4,19 +4,19 @@
 [![Known Vulnerabilities](https://snyk.io/test/npm/name/badge.svg)](https://snyk.io/test/npm/aurelia-authentication)
 [![Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg?maxAge=2592000?style=plastic)](https://gitter.im/SpoonX/Dev)
 
-> Aurelia-authentication is a token-based authentication plugin for [Aurelia](http://aurelia.io/) with support for popular social authentication providers (Google, Twitter, Facebook, LinkedIn, Windows Live, FourSquare, Yahoo, Github, Instagram) and a local stragegy, i.e. simple username / email and password. It developed of a fork of [paul van bladel's aurelia-auth](https://github.com/paulvanbladel/aurelia-auth/) which itself is a port of the great [Satellizer](https://github.com/sahat/satellizer/) library.
+> Aurelia-authentication is a token-based authentication plugin for [Aurelia](http://aurelia.io/) with support for popular social authentication providers (Google, Twitter, Facebook, LinkedIn, Windows Live, FourSquare, Yahoo, Github, Instagram) and a local strategy, i.e. simple username / email and password. It developed of a fork of [paul van bladel's aurelia-auth](https://github.com/paulvanbladel/aurelia-auth/) which itself is a port of the great [Satellizer](https://github.com/sahat/satellizer/) library.
 
-Aurelia-authentication makes local and third-party authentication easy. Burelia-authentication does not use any cookies but relies on a token (designed for JWT, but has basic support for others as well) stored in the local storage of the browser. If your server is setup right, it can be a simple as just to select your server endpoint from your [aurelia-api](https://github.com/SpoonX/aurelia-api) setup, add your third-party client ids and you are ready to go.
+Aurelia-authentication makes local and third-party authentication easy. Aurelia-authentication does not use any cookies but relies on a token (designed for JWT, but has basic support for others as well) stored in the local storage of the browser. If your server is setup right, it can be a simple as just to select your server endpoint from your [aurelia-api](https://github.com/SpoonX/aurelia-api) setup, add your third-party client ids and you are ready to go.
 
-You have multiple endpoints? No problem! In the recommended setting,  aurelia-authentication makes use of [aurelia-api](https://github.com/SpoonX/aurelia-api) which can set up multiple endpoints. Just specifiy in your aurelia-authentication configuration which endpoint you want to use for your server and which further endpoints you want to be configured and your token will be sent automatically to your protected API when the user is authenticated.
+You have multiple endpoints? No problem! In the recommended setting, aurelia-authentication makes use of [aurelia-api](https://github.com/SpoonX/aurelia-api) which can set up multiple endpoints. Just specify in your aurelia-authentication configuration which endpoint you want to use for your server and which further endpoints you want to be configured and your token will be sent automatically to your protected API when the user is authenticated.
 
 With aurelia-authentication you can:
 
 * Use local or third-party providers to authenticate the user
 * Automatically add your token to requests to the specified endpoints
 * Automatically refresh your token
-* Extensivly customize the settings
-* Use standalone or in conjuction with [aurelia-api](https://github.com/SpoonX/aurelia-api)
+* Extensively customize the settings
+* Use standalone or in conjunction with [aurelia-api](https://github.com/SpoonX/aurelia-api)
 * And more
 
 ## Important note
@@ -28,6 +28,24 @@ We've simplified installation and usage! This plugin should now be installed usi
 ### Jspm/SytemJs
 
 Run `jspm i aurelia-authentication` from your project root.
+
+If install breaks your application, try resolving jspm forks: 
+
+```
+$ jspm inspect --forks
+$ jspm resolve --only registry:package-name@version
+```
+
+E.g. 
+
+```
+$ jspm inspect --forks
+     Installed Forks
+
+         npm:aurelia-dependency-injection 1.0.0-beta.1.2.3 1.0.0-beta.2.1.0
+         
+$ jspm resolve --only npm:aurelia-dependency-injection@1.0.0-beta.2.1.0
+```
 
 ### Webpack
 
@@ -99,18 +117,21 @@ export class Login {
     };
 
     // use authService.login(credentialsObject) to login to your auth server
+    // authService.authenticated holds the current status
+    // authService.getPayload() gives you the current payload object
     login(credentialsObject) {
       return this.authService.login(credentialsObject)
         .then(() => {
-            this.authenticated = this.authService.isAuthenticated();
+            this.authenticated = this.authService.authenticated;
         });
     };
 
     // use authService.logout to delete stored data
+    // set expiredRedirect in your settings to automatically redirect
     logout() {
       return this.authService.logout()
         .then(() => {
-          this.authenticated = this.authService.isAuthenticated();
+          this.authenticated = this.authService.authenticated;
         });
     }
 
@@ -118,7 +139,7 @@ export class Login {
     authenticateFacebook() {
       return this.authService.authenticate('facebook')
         .then(() => {
-          this.authenticated  = this.authService.isAuthenticated();
+          this.authenticated  = this.authService.authenticated;
         });
     }
 }
@@ -130,12 +151,14 @@ export class Login {
 authService
   // the Rest instance of aurelia-api used for requests. '.client.client' is the used httpClient instance (from aurelia-fetch-client)
   .client
+  // the current authentication status
+  .authenticated
   // signup into server with credentials and optionally logs in
-  .signup(credentials: Object)): Promise<Response>
+  .signup(credentials: Object[, RequestObtions: Object[, redirectUri: string]]): Promise<Response>
    // log into server with credentials. Stores response if successful
-  .login(credentials: Object): Promise<Response>
-  // deletes stored response
-  .logout([redirectUri: string]): Promise<>
+  .login(credentials: Object[, RequestObtions: Object[, redirectUri: string]]): Promise<Response>
+  // deletes stored response. Sends optionally a logout request
+  .logout([redirectUri: string]): Promise<>|Promise<Response>
   // manually refresh authentication. Needs refreshToken options to be configured
   .updateToken(): Promise<Response> {
   // link third-party account or log into server via third-party authentication. Stores response if successful
@@ -149,11 +172,13 @@ authService
   // check if token is available and, if applicable, not expired
   .isAuthenticated(): boolean
   // get token payload if available
-  .getTokenPayload(): string
+  .getTokenPayload(): Object
   // get the token ttl if available
   .getTtl(): Number
+  // get the token exp if available
+  .getExp(): Number
 ```
 
-Additionnally, you can use `AuthFilterValueConverter` and `AuthorizeStep` for UI feedback.
+Additionally, you can use `AuthFilterValueConverter` and `AuthenticatedStep` for UI feedback.
 
 You can find more information in the [aurelia-authentication-docs](http://aurelia-authentication.spoonx.org/).

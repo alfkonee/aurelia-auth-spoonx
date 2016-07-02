@@ -1,7 +1,6 @@
 import {inject} from 'aurelia-dependency-injection';
 import {buildQueryString} from 'aurelia-path';
 import extend from 'extend';
-
 import {Storage} from './storage';
 import {Popup} from './popup';
 import {BaseConfig} from './baseConfig';
@@ -23,10 +22,10 @@ export class OAuth1 {
 
   open(options, userData) {
     const provider  = extend(true, {}, this.defaults, options);
-    const serverUrl = this.config.withBase(provider.url);
+    const serverUrl = this.config.joinBase(provider.url);
 
     if (this.config.platform !== 'mobile') {
-      this.popup = this.popup.open('', provider.name, provider.popupOptions, provider.redirectUri);
+      this.popup = this.popup.open('', provider.name, provider.popupOptions);
     }
 
     return this.config.client.post(serverUrl)
@@ -34,7 +33,7 @@ export class OAuth1 {
         const url = provider.authorizationEndpoint + '?' + buildQueryString(response);
 
         if (this.config.platform === 'mobile') {
-          this.popup = this.popup.open(url, provider.name, provider.popupOptions,  provider.redirectUri);
+          this.popup = this.popup.open(url, provider.name, provider.popupOptions);
         } else {
           this.popup.popupWindow.location = url;
         }
@@ -49,7 +48,7 @@ export class OAuth1 {
 
   exchangeForToken(oauthData, userData, provider) {
     const data        = extend(true, {}, userData, oauthData);
-    const serverUrl   = this.config.withBase(provider.url);
+    const serverUrl   = this.config.joinBase(provider.url);
     const credentials = this.config.withCredentials ? 'include' : 'same-origin';
 
     return this.config.client.post(serverUrl, data, {credentials: credentials});

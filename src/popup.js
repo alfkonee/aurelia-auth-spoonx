@@ -1,3 +1,4 @@
+import {PLATFORM, DOM} from 'aurelia-pal';
 import {parseQueryString} from 'aurelia-path';
 import extend from 'extend';
 
@@ -8,11 +9,11 @@ export class Popup {
     this.url         = '';
   }
 
-  open(url, windowName, options, redirectUri) {
+  open(url, windowName, options) {
     this.url = url;
     const optionsString = buildPopupWindowOptions(options || {});
 
-    this.popupWindow = window.open(url, windowName, optionsString);
+    this.popupWindow = PLATFORM.global.open(url, windowName, optionsString);
 
     if (this.popupWindow && this.popupWindow.focus) {
       this.popupWindow.focus();
@@ -28,7 +29,7 @@ export class Popup {
           return;
         }
 
-        const parser  = document.createElement('a');
+        const parser  = DOM.createElement('a');
         parser.href = event.url;
 
         if (parser.search || parser.hash) {
@@ -56,11 +57,11 @@ export class Popup {
 
   pollPopup() {
     return new Promise((resolve, reject) => {
-      this.polling = setInterval(() => {
+      this.polling = PLATFORM.global.setInterval(() => {
         let errorData;
 
         try {
-          if (this.popupWindow.location.host ===  document.location.host
+          if (this.popupWindow.location.host ===  PLATFORM.global.document.location.host
             && (this.popupWindow.location.search || this.popupWindow.location.hash)) {
             const qs = parseUrl(this.popupWindow.location);
 
@@ -71,20 +72,20 @@ export class Popup {
             }
 
             this.popupWindow.close();
-            clearInterval(this.polling);
+            PLATFORM.global.clearInterval(this.polling);
           }
         } catch (error) {
           errorData = error;
         }
 
         if (!this.popupWindow) {
-          clearInterval(this.polling);
+          PLATFORM.global.clearInterval(this.polling);
           reject({
             error: errorData,
             data: 'Provider Popup Blocked'
           });
         } else if (this.popupWindow.closed) {
-          clearInterval(this.polling);
+          PLATFORM.global.clearInterval(this.polling);
           reject({
             error: errorData,
             data: 'Problem poll popup'
@@ -102,8 +103,8 @@ const buildPopupWindowOptions = options => {
   const extended = extend({
     width: width,
     height: height,
-    left: window.screenX + ((window.outerWidth - width) / 2),
-    top: window.screenY + ((window.outerHeight - height) / 2.5)
+    left: PLATFORM.global.screenX + ((PLATFORM.global.outerWidth - width) / 2),
+    top: PLATFORM.global.screenY + ((PLATFORM.global.outerHeight - height) / 2.5)
   }, options);
 
   let parts = [];

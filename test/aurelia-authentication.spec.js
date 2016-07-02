@@ -6,7 +6,8 @@ import {
   configure,
   FetchConfig,
   AuthService,
-  AuthorizeStep
+  AuthorizeStep,
+  AuthenticateStep
 } from '../src/aurelia-authentication';
 import {BaseConfig} from '../src/baseConfig';
 
@@ -41,17 +42,26 @@ describe('aurelia-authentication', function() {
     it('Should export AuthorizeStep', function() {
       expect(AuthorizeStep).toBeDefined();
     });
+
+    it('Should export AuthenticateStep', function() {
+      expect(AuthenticateStep).toBeDefined();
+    });
   });
 
   describe('configure()', function() {
     it('Should call globalResources configuration to be passed as a function.', function() {
       let container = new Container();
 
+      let globalResources = [];
       configure({
         container: container, globalResources: resource => {
-          expect(resource).toEqual('./authFilter');
+          globalResources.push(resource);
         }
       }, noop);
+
+      const expected = ['./authFilterValueConverter'];
+
+      expect(globalResources.toString()).toEqual(expected.toString());
     });
 
     it('Should allow configuration with a function.', function() {
