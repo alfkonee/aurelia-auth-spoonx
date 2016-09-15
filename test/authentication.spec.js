@@ -20,6 +20,17 @@ const tokenFuture = {
   jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoidG9rZW5GdXR1cmUiLCJhZG1pbiI6dHJ1ZSwiZXhwIjoiMjQ2MDAxNzE1NCJ9.iHXLzWGY5U9WwVT4IVRLuKTf65XpgrA1Qq_Jlynv6bc'
 };
 
+const oidcProviderConfig = {
+  providers: {
+    oidcProvider: {
+      name: 'oidcProvider',
+      oauthType: '2.0',
+      postLogoutRedirectUri: 'http://localhost:1927/',
+      logoutEndpoint: 'http://localhost:54540/connect/logout',
+      popupOptions: { width: 1028, height: 529 }
+    }
+  }
+};
 
 describe('Authentication', () => {
   describe('.getResponseObject', () => {
@@ -82,6 +93,14 @@ describe('Authentication', () => {
 
       expect(authentication.getAccessToken()).toBe('some');
     });
+
+    it('Should use custom function to analyze response first and return accessToken', () => {
+      authentication.config.getAccessTokenFromResponse = response => response.custom;
+
+      authentication.setResponseObject({custom: 'custom'});
+
+      expect(authentication.getAccessToken()).toBe('custom');
+    });
   });
 
   describe('.getRefreshToken()', () => {
@@ -95,9 +114,34 @@ describe('Authentication', () => {
 
     it('Should analyze response first and return refreshToken', () => {
       authentication.config.useRefreshToken = true;
+
       authentication.setResponseObject({token: 'some', refresh_token: 'another'});
 
       expect(authentication.getRefreshToken()).toBe('another');
+    });
+
+    it('Should use custom function to analyze response first and return refreshToken', () => {
+      authentication.config.useRefreshToken = true;
+      authentication.config.getRefreshTokenFromResponse = response => response.custom;
+
+      authentication.setResponseObject({token: 'some', custom: 'other custom'});
+
+      expect(authentication.getRefreshToken()).toBe('other custom');
+    });
+  });
+
+  describe('.getIdToken()', () => {
+    const container      = new Container();
+    const authentication = container.get(Authentication);
+
+    afterEach(() => {
+      authentication.setResponseObject(null);
+    });
+
+    it('Should analyze response first and return idToken', () => {
+      authentication.setResponseObject({access_token: 'some', id_token: 'another'});
+
+      expect(authentication.getIdToken()).toBe('another');
     });
   });
 
@@ -146,6 +190,16 @@ describe('Authentication', () => {
       const exp = authentication.getExp();
       expect(typeof exp === 'number').toBe(true);
       expect(exp).toBe(Number(tokenPast.payload.exp));
+    });
+
+    it('Should use custom function to analyze response first and return exp', () => {
+      authentication.config.getExpirationDateFromResponse = response => response.custom;
+
+      authentication.setResponseObject({token: 'some', custom: 2460017154});
+
+      const exp = authentication.getExp();
+      expect(typeof exp === 'number').toBe(true);
+      expect(exp).toBe(2460017154);
     });
   });
 
@@ -334,7 +388,7 @@ describe('Authentication', () => {
     it('Should set data from non-JWT response', () => {
       authentication.getDataFromResponse({access_token: 'token'});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.responseAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe('token');
       expect(authentication.payload).toBe(null);
       expect(Number.isNaN(authentication.exp)).toBe(true);
@@ -343,7 +397,7 @@ describe('Authentication', () => {
     it('Should set data from JWT-like response', () => {
       authentication.getDataFromResponse({access_token: 'xx.yy.zz'});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.responseAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe('xx.yy.zz');
       expect(authentication.payload).toBe(null);
       expect(Number.isNaN(authentication.exp)).toBe(true);
@@ -352,13 +406,63 @@ describe('Authentication', () => {
     it('Should set data from JWT response', () => {
       authentication.getDataFromResponse({access_token: tokenFuture.jwt});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.responseAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe(tokenFuture.jwt);
       expect(JSON.stringify(authentication.payload)).toBe(JSON.stringify(tokenFuture.payload));
       expect(authentication.exp).toBe(Number(tokenFuture.payload.exp));
     });
   });
 
+  describe('.logout', () => {
+    const container      = new Container();
+    const authentication = container.get(Authentication);
+
+    afterEach(() => {
+      authentication.setResponseObject(null);
+    });
+
+    it('should return Not Applicable when logoutEndpoint not defined', done => {
+      authentication.config.configure(oidcProviderConfig);
+      authentication.config.providers.oidcProvider.logoutEndpoint = null;
+      authentication.logout('oidcProvider')
+        .then( (value) => {
+          expect(value).toBe('Not Applicable');
+          done();
+        })
+        .catch( err => {
+          done();
+        });
+    });
+
+    it('should return Not Applicable when oauthType not equal to 2.0', done => {
+      authentication.config.configure(oidcProviderConfig);
+      authentication.config.providers.oidcProvider.oauthType = '1.0';
+      authentication.logout('oidcProvider')
+        .then( (value) => {
+          expect(value).toBe('Not Applicable');
+          done();
+        })
+        .catch( err => {
+          done();
+        });
+    });
+
+    it('should return state', done => {
+      let stateValue = '123456789';
+      authentication.config.configure(oidcProviderConfig);
+      spyOn(authentication.oAuth2, 'close').and.callFake(() => {
+        return Promise.resolve(stateValue);
+      });
+      authentication.logout('oidcProvider')
+        .then( state => {
+          expect(state).toBe(stateValue);
+          done();
+        })
+        .catch( err => {
+          done();
+        });
+    });
+  });
 
   describe('.redirect', () => {
     const container      = new Container();

@@ -1,5 +1,55 @@
+<a name="3.0.0-rc10"></a>
+# [3.0.0-rc10](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc9...v3.0.0-rc10) (2016-08-25)
+
+
+### Bug Fixes
+
+* **bundle:** re-add imports for bundling ([4b6208c](https://github.com/spoonx/aurelia-authentication/commit/4b6208c))
+
+
+
+<a name="3.0.0-rc9"></a>
+# [3.0.0-rc9](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc8...v3.0.0-rc9) (2016-08-23)
+
+
+### Bug Fixes
+
+* **authService:** let authService.isAuthenticated analyse token from storage each time (as was intended) ([e2ef686](https://github.com/spoonx/aurelia-authentication/commit/e2ef686))
+* **authService:** listen to storage events. fixes login/logout in other tabs ([52c2f67](https://github.com/spoonx/aurelia-authentication/commit/52c2f67))
+* **oauth implicit:** removed encoding of space character between response types when returning token from popup. ([e444e0b](https://github.com/spoonx/aurelia-authentication/commit/e444e0b))
+
+
+### Features
+
+* **authService:** add getIdToken method to authenticaton and authService ([00a7368](https://github.com/spoonx/aurelia-authentication/commit/00a7368))
+* **config:** optional functions getExpirationDateFromResponse, getAccessTokenFromResponse and getRefreshTokenFromResponse ([352e5a4](https://github.com/spoonx/aurelia-authentication/commit/352e5a4))
+
+
+### BREAKING CHANGES
+
+* authService: hasDataAnalyzed renamed to responseAnalyzed
+
+
+
+<a name="3.0.0-rc8"></a>
+## [3.0.0-rc8](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc7...v3.0.0-rc8) (2016-08-03)
+
+
+### Bug Fixes
+
+* **popup:** removed '#' character from hash fragment in redirect URL from popup. (Issue [#223](https://github.com/spoonx/aurelia-authentication/issues/223)). ([baf9148](https://github.com/spoonx/aurelia-authentication/commit/baf9148))
+
+
+<a name="3.0.0-rc7"></a>
+## [3.0.0-rc7](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc2...v3.0.0-rc7) (2016-07-22)
+
+
+<a name="3.0.0-rc6"></a>
+## [3.0.0-rc6](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc5...v3.0.0-rc6) (2016-07-04)
+
+
 <a name"3.0.0-rc5"></a>
-### 3.0.1 (2016-06-15)
+### 3.0.0-rc5 (2016-06-15)
 
 
 #### Bug Fixes

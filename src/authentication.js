@@ -1,4 +1,6 @@
+/// <reference path="../test/oAuth2.spec.js" />
 import {PLATFORM} from 'aurelia-pal';
+import {buildQueryString} from 'aurelia-path';
 import {inject} from 'aurelia-dependency-injection';
 import {deprecated} from 'aurelia-metadata';
 import jwtDecode from 'jwt-decode';
@@ -7,9 +9,9 @@ import {BaseConfig}  from './baseConfig';
 import {Storage} from './storage';
 import {OAuth1} from './oAuth1';
 import {OAuth2} from './oAuth2';
-import {Auth0Lock} from './auth0Lock';
+import {AuthLock} from './authLock';
 
-@inject(Storage, BaseConfig, OAuth1, OAuth2, Auth0Lock)
+@inject(Storage, BaseConfig, OAuth1, OAuth2, AuthLock)
 export class Authentication {
   constructor(storage, config, oAuth1, oAuth2, auth0Lock) {
     this.storage              = storage;
@@ -20,9 +22,10 @@ export class Authentication {
     this.updateTokenCallstack = [];
     this.accessToken          = null;
     this.refreshToken         = null;
+    this.idToken              = null;
     this.payload              = null;
     this.exp                  = null;
-    this.hasDataStored        = false;
+    this.responseAnalyzed     = false;
   }
 
 
@@ -68,6 +71,11 @@ export class Authentication {
     this.setResponseObject(response);
   }
 
+  get hasDataStored() {
+    LogManager.getLogger('authentication').warn('Authentication.hasDataStored is deprecated. Use Authentication.responseAnalyzed instead.');
+    return this.responseAnalyzed;
+  }
+
   /* get/set responseObject */
 
   getResponseObject() {
@@ -80,12 +88,12 @@ export class Authentication {
       this.storage.set(this.config.storageKey, JSON.stringify(response));
       return;
     }
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.payload = null;
-    this.exp = null;
-
-    this.hasDataStored = false;
+    this.accessToken      = null;
+    this.refreshToken     = null;
+    this.idToken          = null;
+    this.payload          = null;
+    this.exp              = null;
+    this.responseAnalyzed = false;
 
     this.storage.remove(this.config.storageKey);
   }
@@ -94,22 +102,27 @@ export class Authentication {
   /* get data, update if needed first */
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
+  getIdToken() {
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+    return this.idToken;
+  }
+
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -138,30 +151,49 @@ export class Authentication {
   getDataFromResponse(response) {
     const config   = this.config;
 
-    this.accessToken = this.getTokenFromResponse(response, config.accessTokenProp, config.accessTokenName, config.accessTokenRoot);
+    // get access token either with from supplied parameters or with supplied function
+    this.accessToken = typeof this.config.getAccessTokenFromResponse === 'function'
+                     ? this.config.getAccessTokenFromResponse(response)
+                     : this.getTokenFromResponse(response, config.accessTokenProp, config.accessTokenName, config.accessTokenRoot);
+
 
     this.refreshToken = null;
     if (config.useRefreshToken) {
       try {
-        this.refreshToken = this.getTokenFromResponse(response, config.refreshTokenProp, config.refreshTokenName, config.refreshTokenRoot);
+        // get refresh token either with from supplied parameters or with supplied function
+        this.refreshToken = typeof this.config.getRefreshTokenFromResponse === 'function'
+                         ? this.config.getRefreshTokenFromResponse(response)
+                         : this.getTokenFromResponse(response, config.refreshTokenProp, config.refreshTokenName, config.refreshTokenRoot);
       } catch (e) {
         this.refreshToken = null;
+
+        LogManager.getLogger('authentication').warn('useRefreshToken is set, but could not extract a refresh token');
       }
     }
 
-    this.payload = null;
+    this.idToken = null;
+    try {
+      this.idToken = this.getTokenFromResponse(response, config.idTokenProp, config.idTokenName, config.idTokenRoot);
+    } catch (e) {
+      this.idToken = null;
+    }
 
+    this.payload = null;
     try {
       this.payload = this.accessToken ? jwtDecode(this.accessToken) : null;
     } catch (_) {_;}
 
-    this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
+    // get exp either with from jwt or with supplied function
+    this.exp = typeof this.config.getExpirationDateFromResponse === 'function'
+            ? this.config.getExpirationDateFromResponse(response)
+            : (this.payload && parseInt(this.payload.exp, 10)) ||  NaN;
 
-    this.hasDataStored = true;
+    this.responseAnalyzed = true;
 
     return {
       accessToken: this.accessToken,
       refreshToken: this.refreshToken,
+      idToken: this.idToken,
       payload: this.payload,
       exp: this.exp
     };
@@ -230,7 +262,15 @@ export class Authentication {
     return providerLogin.open(this.config.providers[name], userData);
   }
 
-  redirect(redirectUrl, defaultRedirectUrl) {
+  logout(name) {
+    let rtnValue = Promise.resolve('Not Applicable');
+    if (this.config.providers[name].oauthType !== '2.0' || !this.config.providers[name].logoutEndpoint) {
+      return rtnValue;
+    }
+    return this.oAuth2.close(this.config.providers[name]);
+  }
+
+  redirect(redirectUrl, defaultRedirectUrl, query) {
     // stupid rule to keep it BC
     if (redirectUrl === true) {
       LogManager.getLogger('authentication').warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === 0 instead.');
@@ -245,9 +285,9 @@ export class Authentication {
       return;
     }
     if (typeof redirectUrl === 'string') {
-      PLATFORM.location.href = encodeURI(redirectUrl);
+      PLATFORM.location.href = encodeURI(redirectUrl + (query ? `?${buildQueryString(query)}` : ''));
     } else if (defaultRedirectUrl) {
-      PLATFORM.location.href = defaultRedirectUrl;
+      PLATFORM.location.href = defaultRedirectUrl + (query ? `?${buildQueryString(query)}` : '');
     }
   }
 }

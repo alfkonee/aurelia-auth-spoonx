@@ -1,11 +1,13 @@
 import {PLATFORM} from 'aurelia-pal';
 import {inject} from 'aurelia-dependency-injection';
 import {deprecated} from 'aurelia-metadata';
+import {EventAggregator} from 'aurelia-event-aggregator';
+import {BindingSignaler} from 'aurelia-templating-resources';
 import * as LogManager from 'aurelia-logging';
 import {Authentication} from './authentication';
 import {BaseConfig} from './baseConfig';
 
-@inject(Authentication, BaseConfig)
+@inject(Authentication, BaseConfig, BindingSignaler, EventAggregator)
 export class AuthService {
   /**
    * The Authentication instance that handles the token
@@ -38,16 +40,20 @@ export class AuthService {
   /**
    *  Create an AuthService instance
    *
-   * @param  {Authentication} authentication The Authentication instance to be used
-   * @param  {Config}         config         The Config instance to be used
+   * @param  {Authentication}  authentication  The Authentication instance to be used
+   * @param  {Config}          config          The Config instance to be used
+   * @param  {BindingSignaler} bindingSignaler The BindingSignaler instance to be used
+   * @param  {EventAggregator} eventAggregator The EventAggregator instance to be used
    */
-  constructor(authentication, config) {
-    this.authentication = authentication;
-    this.config         = config;
+  constructor(authentication, config, bindingSignaler, eventAggregator) {
+    this.authentication  = authentication;
+    this.config          = config;
+    this.bindingSignaler = bindingSignaler;
+    this.eventAggregator = eventAggregator;
 
     // get token stored in previous format over
     const oldStorageKey = config.tokenPrefix
-                        ? config.tokenPrefix + '_' + config.tokenName
+                        ? `${config.tokenPrefix}_${config.tokenName}`
                         : config.tokenName;
     const oldToken = authentication.storage.get(oldStorageKey);
 
@@ -61,7 +67,32 @@ export class AuthService {
 
     // initialize status by resetting if existing stored responseObject
     this.setResponseObject(this.authentication.getResponseObject());
+
+    // listen to storage events in case the user logs in or out in another tab/window
+    PLATFORM.addEventListener('storage', this.storageEventHandler);
   }
+
+  /**
+   * The handler used for storage events. Detects and handles authentication changes in other tabs/windows
+   *
+   * @param {StorageEvent}
+   */
+  storageEventHandler = event => {
+    if (event.key !== this.config.storageKey) {
+      return;
+    }
+
+    LogManager.getLogger('authentication').info('Stored token changed event');
+
+    let wasAuthenticated = this.authenticated;
+    this.authentication.responseAnalyzed = false;
+    this.updateAuthenticated();
+
+    if (this.config.storageChangedRedirect && wasAuthenticated !== this.authenticated) {
+      PLATFORM.location.assign(this.config.storageChangedRedirect);
+    }
+  }
+
 
   /**
    * Getter: The configured client for all aurelia-authentication requests
@@ -72,6 +103,12 @@ export class AuthService {
     return this.config.client;
   }
 
+  /**
+   * Getter: The authentication class instance
+   *
+   * @return {boolean}
+   * @deprecated
+   */
   get auth() {
     LogManager.getLogger('authentication').warn('AuthService.auth is deprecated. Use .authentication instead.');
     return this.authentication;
@@ -90,8 +127,14 @@ export class AuthService {
         && this.authentication.getAccessToken()
         && this.authentication.getRefreshToken()) {
         this.updateToken();
-      } else {
-        this.logout(this.config.expiredRedirect);
+
+        return;
+      }
+
+      this.setResponseObject(null);
+
+      if (this.config.expiredRedirect) {
+        PLATFORM.location.assign(this.config.expiredRedirect);
       }
     }, ttl);
   }
@@ -112,13 +155,29 @@ export class AuthService {
    * @param {Object} response The servers response as GOJO
    */
   setResponseObject(response) {
-    this.clearTimeout();
-
     this.authentication.setResponseObject(response);
 
+    this.updateAuthenticated();
+  }
+
+  /**
+   * Update authenticated. Sets login status and timeout
+   */
+  updateAuthenticated() {
+    this.clearTimeout();
+
+    let wasAuthenticated = this.authenticated;
     this.authenticated = this.authentication.isAuthenticated();
+
     if (this.authenticated && !Number.isNaN(this.authentication.exp)) {
       this.setTimeout(this.getTtl() * 1000);
+    }
+
+    if (wasAuthenticated !== this.authenticated) {
+      this.bindingSignaler.signal('authentication-change');
+      this.eventAggregator.publish('authentication-change', this.authenticated);
+
+      LogManager.getLogger('authentication').info(`Authorization changed to: ${this.authenticated}`);
     }
   }
 
@@ -177,12 +236,23 @@ export class AuthService {
     return this.authentication.getRefreshToken();
   }
 
+  /**
+   * Get idToken from storage
+   *
+   * @returns {String} Current idToken
+   */
+  getIdToken() {
+    return this.authentication.getIdToken();
+  }
+
  /**
-  * Gets authentication status
+  * Gets authentication status from storage
   *
   * @returns {Boolean} For Non-JWT and unexpired JWT: true, else: false
   */
   isAuthenticated() {
+    this.authentication.responseAnalyzed = false;
+
     let authenticated = this.authentication.isAuthenticated();
 
     // auto-update token?
@@ -281,8 +351,8 @@ export class AuthService {
     let content;
 
     if (typeof arguments[0] === 'object') {
-      content = arguments[0];
-      options = arguments[1];
+      content     = arguments[0];
+      options     = arguments[1];
       redirectUri = arguments[2];
     } else {
       content = {
@@ -316,9 +386,9 @@ export class AuthService {
     let content;
 
     if (typeof arguments[0] === 'object') {
-      content             = arguments[0];
+      content              = arguments[0];
       optionsOrRedirectUri = arguments[1];
-      redirectUri         = arguments[2];
+      redirectUri          = arguments[2];
     } else {
       content = {
         'email': emailOrCredentials,
@@ -344,26 +414,40 @@ export class AuthService {
   /**
    * logout locally and redirect to redirectUri (if set) or redirectUri of config. Sends logout request first, if set in config
    *
-   * @param {[String]}    [redirectUri]                      [optional redirectUri overwrite]
+   * @param {[String]}    [redirectUri]                     [optional redirectUri overwrite]
+   * @param {[String]}    [query]                           [optional query]
+   * @param {[String]}    [name]                            [optional name Name of the provider]
    *
    * @return {Promise<>|Promise<Object>|Promise<Error>}     Server response as Object
    */
-  logout(redirectUri) {
+  logout(redirectUri, query, name) {
     let localLogout = response => new Promise(resolve => {
       this.setResponseObject(null);
 
-      this.authentication.redirect(redirectUri, this.config.logoutRedirect);
+      this.authentication.redirect(redirectUri, this.config.logoutRedirect, query);
 
       if (typeof this.onLogout === 'function') {
         this.onLogout(response);
       }
-
       resolve(response);
     });
 
-    return (this.config.logoutUrl
-      ? this.client.request(this.config.logoutMethod, this.config.joinBase(this.config.logoutUrl)).then(localLogout)
-      : localLogout());
+    if (name) {
+      if (this.config.providers[name].logoutEndpoint) {
+        return this.authentication.logout(name)
+          .then(logoutResponse => {
+            let stateValue = this.authentication.storage.get(name + '_state');
+            if (logoutResponse.state !== stateValue) {
+              return Promise.reject('OAuth2 response state value differs');
+            }
+            return localLogout(logoutResponse);
+          });
+      }
+    } else {
+      return (this.config.logoutUrl
+        ? this.client.request(this.config.logoutMethod, this.config.joinBase(this.config.logoutUrl)).then(localLogout)
+        : localLogout());
+    }
   }
 
   /**

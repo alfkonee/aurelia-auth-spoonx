@@ -23,8 +23,10 @@ loginRoute = '/login';
 loginOnSignup = true;
 // If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
 signupRedirect = '#/login';
-// redirect  when token expires. 0 = don't redirect (default), 1 = use logoutRedirect, string = redirect there
-expiredRedirect = 0;
+// reload page when token expires. 0 = don't reload (default), 1 = do reload page
+expiredReload = 0;
+// reload page when storage changed aka login/logout in other tabs/windows. 0 = don't reload (default), 1 = do reload page
+storageChangedReload = 0;
 
 
 // API related options
@@ -58,7 +60,7 @@ unlinkMethod = 'get';
 authHeader = 'Authorization';
 // The token name used in the header of API requests that require authentication
 authTokenType = 'Bearer';
-// The the property from which to get the access token after a successful login or signup
+// The property from which to get the access token after a successful login or signup
 accessTokenProp = 'access_token';
 
 
@@ -80,7 +82,7 @@ useRefreshToken = false;
 autoUpdateToken = true;
 // Oauth Client Id
 clientId = false;
-// The the property from which to get the refresh token after a successful token refresh
+// The property from which to get the refresh token after a successful token refresh
 refreshTokenProp = 'refresh_token';
 
 // If the property defined by `refreshTokenProp` is an object:
@@ -90,6 +92,21 @@ refreshTokenProp = 'refresh_token';
 refreshTokenName = 'token';
 // This allows the refresh token to be a further object deeper `{ "refreshTokenProp": { "refreshTokenRoot" : { "refreshTokenName" : '...' } } }`
 refreshTokenRoot = false;
+
+
+// Id Token Options
+// =====================
+
+// The property from which to get the id token after a successful login
+idTokenProp = 'id_token';
+
+// If the property defined by `idTokenProp` is an object:
+// -----------------------------------------------------------
+
+// This is the property from which to get the token `{ "idTokenProp": { "idTokenName" : '...' } }`
+idTokenName = 'token';
+// This allows the id token to be a further object deeper `{ "idTokenProp": { "idTokenRoot" : { "idTokenName" : '...' } } }`
+idTokenRoot = false;
 
 
 // Miscellaneous Options
@@ -106,6 +123,15 @@ platform = 'browser';
 storage = 'localStorage';
 // The key used for storing the authentication response locally
 storageKey = 'aurelia_authentication';
+// optional function to extract the expiration date. takes the server response as parameter
+// eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() + serverResponse.expires_in * 1000;
+getExpirationDateFromResponse = null;
+// optional function to extract the access token from the response. takes the server response as parameter
+// eg: getAccessTokenFromResponse = serverResponse => serverResponse.data[0].access_token;
+getAccessTokenFromResponse = null;
+// optional function to extract the refresh token from the response. takes the server response as parameter
+// eg: getRefreshTokenFromResponse = serverResponse => serverResponse.data[0].refresh_token;
+getRefreshTokenFromResponse = null;
 
 // List of value-converters to make global
 globalValueConverters = ['authFilterValueConverter'];
@@ -243,6 +269,36 @@ providers = {
     state: function() {
       return Math.random().toString(36).substr(2);
     }
+  },
+  genericOIDCProvider: {
+    name: 'identityServer',
+    oauthType: '2.0',
+    clientId: 'MustMatchConfiguredOIDCClientApplication',
+    authorizationEndpoint: 'http://localhost:54540/connect/authorize',
+    redirectUri: 'http://localhost:49862/',
+    logoutEndpoint: 'http://localhost:54540/connect/logout',
+    postLogoutRedirectUri: 'http://localhost:49862/',
+    responseType: 'token id_token',
+    scope: ['openid email profile'],
+    requiredUrlParams: ['scope', 'nonce', 'resource'],
+    state: function () {
+       var text = "";
+       var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+       for (var i = 0; i < 32; i++) {
+         text += possible.charAt(Math.floor(Math.random() * possible.length));
+       }
+       return text;
+    },
+    nonce: function () {
+      var text = "";
+      var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      for (var i = 0; i < 32; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+      }
+      return text;
+    },
+    popupOptions: { width: 1028, height: 529 },
+    resource: 'aurelia-openiddict-resources aurelia-openiddict-server'
   }
 };
 ```

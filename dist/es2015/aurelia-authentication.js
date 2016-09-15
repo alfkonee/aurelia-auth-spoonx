@@ -29,6 +29,9 @@ function _applyDecoratedDescriptor(target, property, decorators, descriptor, con
   return desc;
 }
 
+import { AuthFilterValueConverter } from "./authFilterValueConverter";
+import { AuthenticatedValueConverter } from "./authenticatedValueConverter";
+import { AuthenticatedFilterValueConverter } from "./authenticatedFilterValueConverter";
 import extend from 'extend';
 import * as LogManager from 'aurelia-logging';
 import jwtDecode from 'jwt-decode';
@@ -36,6 +39,8 @@ import { PLATFORM, DOM } from 'aurelia-pal';
 import { parseQueryString, join, buildQueryString } from 'aurelia-path';
 import { inject } from 'aurelia-dependency-injection';
 import { deprecated } from 'aurelia-metadata';
+import { EventAggregator } from 'aurelia-event-aggregator';
+import { BindingSignaler } from 'aurelia-templating-resources';
 import { Redirect } from 'aurelia-router';
 import { HttpClient } from 'aurelia-fetch-client';
 import { Config, Rest } from 'aurelia-api';
@@ -151,7 +156,9 @@ const buildPopupWindowOptions = options => {
 };
 
 const parseUrl = url => {
-  return extend(true, {}, parseQueryString(url.search), parseQueryString(url.hash));
+  let hash = url.hash.charAt(0) === '#' ? url.hash.substr(1) : url.hash;
+
+  return extend(true, {}, parseQueryString(url.search), parseQueryString(hash));
 };
 
 export let BaseConfig = class BaseConfig {
@@ -164,7 +171,8 @@ export let BaseConfig = class BaseConfig {
     this.loginRoute = '/login';
     this.loginOnSignup = true;
     this.signupRedirect = '#/login';
-    this.expiredRedirect = 0;
+    this.expiredRedirect = '#/';
+    this.storageChangedRedirect = '#/';
     this.baseUrl = '';
     this.loginUrl = '/auth/login';
     this.logoutUrl = null;
@@ -186,11 +194,17 @@ export let BaseConfig = class BaseConfig {
     this.refreshTokenProp = 'refresh_token';
     this.refreshTokenName = 'token';
     this.refreshTokenRoot = false;
+    this.idTokenProp = 'id_token';
+    this.idTokenName = 'token';
+    this.idTokenRoot = false;
     this.httpInterceptor = true;
     this.withCredentials = true;
     this.platform = 'browser';
     this.storage = 'localStorage';
     this.storageKey = 'aurelia_authentication';
+    this.getExpirationDateFromResponse = null;
+    this.getAccessTokenFromResponse = null;
+    this.getRefreshTokenFromResponse = null;
     this.globalValueConverters = ['authFilterValueConverter'];
     this.providers = {
       facebook: {
@@ -397,7 +411,7 @@ export let BaseConfig = class BaseConfig {
     return this;
   }
   set current(_) {
-    throw new Error('Setter BaseConfig.current is obsolete. Use BaseConfig directly instead.');
+    throw new Error('Setter BaseConfig.current has been removed. Use BaseConfig directly instead.');
   }
 
   get _current() {
@@ -405,7 +419,7 @@ export let BaseConfig = class BaseConfig {
     return this;
   }
   set _current(_) {
-    throw new Error('Setter BaseConfig._current is obsolete. Use BaseConfig directly instead.');
+    throw new Error('Setter BaseConfig._current has been removed. Use BaseConfig directly instead.');
   }
 };
 
@@ -432,7 +446,7 @@ export let Storage = (_dec = inject(BaseConfig), _dec(_class2 = class Storage {
   }
 }) || _class2);
 
-export let Auth0Lock = (_dec2 = inject(Storage, BaseConfig), _dec2(_class3 = class Auth0Lock {
+export let AuthLock = (_dec2 = inject(Storage, BaseConfig), _dec2(_class3 = class AuthLock {
   constructor(storage, config) {
     this.storage = storage;
     this.config = config;
@@ -581,7 +595,7 @@ export let OAuth2 = (_dec4 = inject(Storage, Popup, BaseConfig), _dec4(_class5 =
     const openPopup = this.config.platform === 'mobile' ? popup.eventListener(provider.redirectUri) : popup.pollPopup();
 
     return openPopup.then(oauthData => {
-      if (provider.responseType === 'token' || provider.responseType === 'id_token%20token' || provider.responseType === 'token%20id_token') {
+      if (provider.responseType === 'token' || provider.responseType === 'id_token token' || provider.responseType === 'token id_token') {
         return oauthData;
       }
       if (oauthData.state && oauthData.state !== this.storage.get(stateName)) {
@@ -637,7 +651,7 @@ const camelCase = function (name) {
   });
 };
 
-export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2, Auth0Lock), _dec6 = deprecated({ message: 'Use baseConfig.loginRoute instead.' }), _dec7 = deprecated({ message: 'Use baseConfig.loginRedirect instead.' }), _dec8 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.loginUrl) instead.' }), _dec9 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.signupUrl) instead.' }), _dec10 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.profileUrl) instead.' }), _dec11 = deprecated({ message: 'Use .getAccessToken() instead.' }), _dec5(_class6 = (_class7 = class Authentication {
+export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2, AuthLock), _dec6 = deprecated({ message: 'Use baseConfig.loginRoute instead.' }), _dec7 = deprecated({ message: 'Use baseConfig.loginRedirect instead.' }), _dec8 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.loginUrl) instead.' }), _dec9 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.signupUrl) instead.' }), _dec10 = deprecated({ message: 'Use baseConfig.joinBase(baseConfig.profileUrl) instead.' }), _dec11 = deprecated({ message: 'Use .getAccessToken() instead.' }), _dec5(_class6 = (_class7 = class Authentication {
   constructor(storage, config, oAuth1, oAuth2, auth0Lock) {
     this.storage = storage;
     this.config = config;
@@ -647,9 +661,10 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     this.updateTokenCallstack = [];
     this.accessToken = null;
     this.refreshToken = null;
+    this.idToken = null;
     this.payload = null;
     this.exp = null;
-    this.hasDataStored = false;
+    this.responseAnalyzed = false;
   }
 
   getLoginRoute() {
@@ -686,6 +701,11 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     this.setResponseObject(response);
   }
 
+  get hasDataStored() {
+    LogManager.getLogger('authentication').warn('Authentication.hasDataStored is deprecated. Use Authentication.responseAnalyzed instead.');
+    return this.responseAnalyzed;
+  }
+
   getResponseObject() {
     return JSON.parse(this.storage.get(this.config.storageKey));
   }
@@ -698,31 +718,36 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     }
     this.accessToken = null;
     this.refreshToken = null;
+    this.idToken = null;
     this.payload = null;
     this.exp = null;
-
-    this.hasDataStored = false;
+    this.responseAnalyzed = false;
 
     this.storage.remove(this.config.storageKey);
   }
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
+  getIdToken() {
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+    return this.idToken;
+  }
+
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -745,32 +770,41 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
   getDataFromResponse(response) {
     const config = this.config;
 
-    this.accessToken = this.getTokenFromResponse(response, config.accessTokenProp, config.accessTokenName, config.accessTokenRoot);
+    this.accessToken = typeof this.config.getAccessTokenFromResponse === 'function' ? this.config.getAccessTokenFromResponse(response) : this.getTokenFromResponse(response, config.accessTokenProp, config.accessTokenName, config.accessTokenRoot);
 
     this.refreshToken = null;
     if (config.useRefreshToken) {
       try {
-        this.refreshToken = this.getTokenFromResponse(response, config.refreshTokenProp, config.refreshTokenName, config.refreshTokenRoot);
+        this.refreshToken = typeof this.config.getRefreshTokenFromResponse === 'function' ? this.config.getRefreshTokenFromResponse(response) : this.getTokenFromResponse(response, config.refreshTokenProp, config.refreshTokenName, config.refreshTokenRoot);
       } catch (e) {
         this.refreshToken = null;
+
+        LogManager.getLogger('authentication').warn('useRefreshToken is set, but could not extract a refresh token');
       }
     }
 
-    this.payload = null;
+    this.idToken = null;
+    try {
+      this.idToken = this.getTokenFromResponse(response, config.idTokenProp, config.idTokenName, config.idTokenRoot);
+    } catch (e) {
+      this.idToken = null;
+    }
 
+    this.payload = null;
     try {
       this.payload = this.accessToken ? jwtDecode(this.accessToken) : null;
     } catch (_) {
       _;
     }
 
-    this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
+    this.exp = typeof this.config.getExpirationDateFromResponse === 'function' ? this.config.getExpirationDateFromResponse(response) : this.payload && parseInt(this.payload.exp, 10) || NaN;
 
-    this.hasDataStored = true;
+    this.responseAnalyzed = true;
 
     return {
       accessToken: this.accessToken,
       refreshToken: this.refreshToken,
+      idToken: this.idToken,
       payload: this.payload,
       exp: this.exp
     };
@@ -829,7 +863,7 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     return providerLogin.open(this.config.providers[name], userData);
   }
 
-  redirect(redirectUrl, defaultRedirectUrl) {
+  redirect(redirectUrl, defaultRedirectUrl, query) {
     if (redirectUrl === true) {
       LogManager.getLogger('authentication').warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === 0 instead.');
       return;
@@ -843,22 +877,40 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
       return;
     }
     if (typeof redirectUrl === 'string') {
-      PLATFORM.location.href = encodeURI(redirectUrl);
+      PLATFORM.location.href = encodeURI(redirectUrl + (query ? `?${ buildQueryString(query) }` : ''));
     } else if (defaultRedirectUrl) {
-      PLATFORM.location.href = defaultRedirectUrl;
+      PLATFORM.location.href = defaultRedirectUrl + (query ? `?${ buildQueryString(query) }` : '');
     }
   }
-}, (_applyDecoratedDescriptor(_class7.prototype, 'getLoginRoute', [_dec6], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginRoute'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getLoginRedirect', [_dec7], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginRedirect'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getLoginUrl', [_dec8], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getSignupUrl', [_dec9], Object.getOwnPropertyDescriptor(_class7.prototype, 'getSignupUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getProfileUrl', [_dec10], Object.getOwnPropertyDescriptor(_class7.prototype, 'getProfileUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getToken', [_dec11], Object.getOwnPropertyDescriptor(_class7.prototype, 'getToken'), _class7.prototype)), _class7)) || _class6);
+}, (_applyDecoratedDescriptor(_class7.prototype, "getLoginRoute", [_dec6], Object.getOwnPropertyDescriptor(_class7.prototype, "getLoginRoute"), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, "getLoginRedirect", [_dec7], Object.getOwnPropertyDescriptor(_class7.prototype, "getLoginRedirect"), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, "getLoginUrl", [_dec8], Object.getOwnPropertyDescriptor(_class7.prototype, "getLoginUrl"), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, "getSignupUrl", [_dec9], Object.getOwnPropertyDescriptor(_class7.prototype, "getSignupUrl"), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, "getProfileUrl", [_dec10], Object.getOwnPropertyDescriptor(_class7.prototype, "getProfileUrl"), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, "getToken", [_dec11], Object.getOwnPropertyDescriptor(_class7.prototype, "getToken"), _class7.prototype)), _class7)) || _class6);
 
-export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = deprecated({ message: 'Use .getAccessToken() instead.' }), _dec12(_class8 = (_class9 = class AuthService {
-  constructor(authentication, config) {
+export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSignaler, EventAggregator), _dec13 = deprecated({ message: 'Use .getAccessToken() instead.' }), _dec12(_class8 = (_class9 = class AuthService {
+  constructor(authentication, config, bindingSignaler, eventAggregator) {
     this.authenticated = false;
     this.timeoutID = 0;
 
+    this.storageEventHandler = event => {
+      if (event.key !== this.config.storageKey) {
+        return;
+      }
+
+      LogManager.getLogger('authentication').info('Stored token changed event');
+
+      let wasAuthenticated = this.authenticated;
+      this.authentication.responseAnalyzed = false;
+      this.updateAuthenticated();
+
+      if (this.config.storageChangedRedirect && wasAuthenticated !== this.authenticated) {
+        PLATFORM.location.assign(this.config.storageChangedRedirect);
+      }
+    };
+
     this.authentication = authentication;
     this.config = config;
+    this.bindingSignaler = bindingSignaler;
+    this.eventAggregator = eventAggregator;
 
-    const oldStorageKey = config.tokenPrefix ? config.tokenPrefix + '_' + config.tokenName : config.tokenName;
+    const oldStorageKey = config.tokenPrefix ? `${ config.tokenPrefix }_${ config.tokenName }` : config.tokenName;
     const oldToken = authentication.storage.get(oldStorageKey);
 
     if (oldToken) {
@@ -870,6 +922,8 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
     }
 
     this.setResponseObject(this.authentication.getResponseObject());
+
+    PLATFORM.addEventListener('storage', this.storageEventHandler);
   }
 
   get client() {
@@ -887,8 +941,14 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
     this.timeoutID = PLATFORM.global.setTimeout(() => {
       if (this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
         this.updateToken();
-      } else {
-        this.logout(this.config.expiredRedirect);
+
+        return;
+      }
+
+      this.setResponseObject(null);
+
+      if (this.config.expiredRedirect) {
+        PLATFORM.location.assign(this.config.expiredRedirect);
       }
     }, ttl);
   }
@@ -901,13 +961,26 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
   }
 
   setResponseObject(response) {
-    this.clearTimeout();
-
     this.authentication.setResponseObject(response);
 
+    this.updateAuthenticated();
+  }
+
+  updateAuthenticated() {
+    this.clearTimeout();
+
+    let wasAuthenticated = this.authenticated;
     this.authenticated = this.authentication.isAuthenticated();
+
     if (this.authenticated && !Number.isNaN(this.authentication.exp)) {
       this.setTimeout(this.getTtl() * 1000);
+    }
+
+    if (wasAuthenticated !== this.authenticated) {
+      this.bindingSignaler.signal('authentication-change');
+      this.eventAggregator.publish('authentication-change', this.authenticated);
+
+      LogManager.getLogger('authentication').info(`Authorization changed to: ${ this.authenticated }`);
     }
   }
 
@@ -940,7 +1013,13 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
     return this.authentication.getRefreshToken();
   }
 
+  getIdToken() {
+    return this.authentication.getIdToken();
+  }
+
   isAuthenticated() {
+    this.authentication.responseAnalyzed = false;
+
     let authenticated = this.authentication.isAuthenticated();
 
     if (!authenticated && this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
@@ -1043,11 +1122,11 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
     });
   }
 
-  logout(redirectUri) {
+  logout(redirectUri, query) {
     let localLogout = response => new Promise(resolve => {
       this.setResponseObject(null);
 
-      this.authentication.redirect(redirectUri, this.config.logoutRedirect);
+      this.authentication.redirect(redirectUri, this.config.logoutRedirect, query);
 
       if (typeof this.onLogout === 'function') {
         this.onLogout(response);
@@ -1077,7 +1156,7 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig), _dec13 = 
       return response;
     });
   }
-}, (_applyDecoratedDescriptor(_class9.prototype, 'getCurrentToken', [_dec13], Object.getOwnPropertyDescriptor(_class9.prototype, 'getCurrentToken'), _class9.prototype)), _class9)) || _class8);
+}, (_applyDecoratedDescriptor(_class9.prototype, "getCurrentToken", [_dec13], Object.getOwnPropertyDescriptor(_class9.prototype, "getCurrentToken"), _class9.prototype)), _class9)) || _class8);
 
 export let AuthenticateStep = (_dec14 = inject(AuthService), _dec14(_class11 = class AuthenticateStep {
   constructor(authService) {
@@ -1162,7 +1241,7 @@ export let FetchConfig = (_dec16 = inject(HttpClient, Config, AuthService, BaseC
             return resolve(response);
           }
 
-          this.authService.updateToken().then(() => {
+          return this.authService.updateToken().then(() => {
             let token = this.authService.getAccessToken();
 
             if (this.config.authTokenType) {
@@ -1206,9 +1285,7 @@ export let FetchConfig = (_dec16 = inject(HttpClient, Config, AuthService, BaseC
   }
 }) || _class13);
 
-import './authFilterValueConverter';
-
-function configure(aurelia, config) {
+export function configure(aurelia, config) {
   if (!PLATFORM.location.origin) {
     PLATFORM.location.origin = PLATFORM.location.protocol + '//' + PLATFORM.location.hostname + (PLATFORM.location.port ? ':' + PLATFORM.location.port : '');
   }
@@ -1254,5 +1331,3 @@ function configure(aurelia, config) {
 
   baseConfig.client = client;
 }
-
-export { configure, FetchConfig, AuthService, AuthorizeStep, AuthenticateStep };

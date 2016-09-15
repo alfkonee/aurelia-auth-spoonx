@@ -58,9 +58,10 @@ export class BaseConfig {
   loginOnSignup = true;
   // If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
   signupRedirect = '#/login';
-  // redirect  when token expires. 0 = don't redirect (default), 1 = use logoutRedirect, string = redirect there
-  expiredRedirect = 0;
-
+  // The SPA url to load when the token expires
+  expiredRedirect = '#/';
+  // The SPA url to load when the authentication status changed in other tabs/windows (detected through storageEvents)
+  storageChangedRedirect = '#/';
 
   // API related options
   // ===================
@@ -128,6 +129,12 @@ export class BaseConfig {
   // This allows the refresh token to be a further object deeper `{ "refreshTokenProp": { "refreshTokenRoot" : { "refreshTokenName" : '...' } } }`
   refreshTokenRoot = false;
 
+  // The property name from which to get the user authentication token. Can also be dotted idTokenProp.idTokenName
+  idTokenProp = 'id_token';
+  // This is the property from which to get the id token `{ "idTokenProp": { "idTokenName" : '...' } }`
+  idTokenName = 'token';
+  // This allows the id_token to be a further object deeper `{ "idTokenProp": { "idTokenRoot" : { "idTokenName" : '...' } } }`
+  idTokenRoot = false;
 
   // Miscellaneous Options
   // =====================
@@ -143,6 +150,15 @@ export class BaseConfig {
   storage = 'localStorage';
   // The key used for storing the authentication response locally
   storageKey = 'aurelia_authentication';
+  // optional function to extract the expiration date. takes the server response as parameter
+  // eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() + serverResponse.expires_in * 1000;
+  getExpirationDateFromResponse = null;
+  // optional function to extract the access token from the response. takes the server response as parameter
+  // eg: getAccessTokenFromResponse = serverResponse => serverResponse.data[0].access_token;
+  getAccessTokenFromResponse = null;
+  // optional function to extract the refresh token from the response. takes the server response as parameter
+  // eg: getRefreshTokenFromResponse = serverResponse => serverResponse.data[0].refresh_token;
+  getRefreshTokenFromResponse = null;
 
   // List of value-converters to make global
   globalValueConverters = ['authFilterValueConverter'];
@@ -278,13 +294,31 @@ export class BaseConfig {
   };
 
   /* deprecated defaults */
+  /**
+   * @deprecated
+   */
   _authToken = 'Bearer';
+  /**
+   * @deprecated
+   */
   _responseTokenProp = 'access_token';
+  /**
+   * @deprecated
+   */
   _tokenName = 'token';
+  /**
+   * @deprecated
+   */
   _tokenRoot = false;
+  /**
+   * @deprecated
+   */
   _tokenPrefix = 'aurelia';
 
   /* deprecated methods and parameteres */
+  /**
+   * @deprecated
+   */
   set authToken(authToken) {
     LogManager.getLogger('authentication').warn('BaseConfig.authToken is deprecated. Use BaseConfig.authTokenType instead.');
     this._authTokenType = authToken;
@@ -295,6 +329,9 @@ export class BaseConfig {
     return this._authTokenType;
   }
 
+  /**
+   * @deprecated
+   */
   set responseTokenProp(responseTokenProp) {
     LogManager.getLogger('authentication').warn('BaseConfig.responseTokenProp is deprecated. Use BaseConfig.accessTokenProp instead.');
     this._responseTokenProp = responseTokenProp;
@@ -305,6 +342,9 @@ export class BaseConfig {
     return this._responseTokenProp;
   }
 
+  /**
+   * @deprecated
+   */
   set tokenRoot(tokenRoot) {
     LogManager.getLogger('authentication').warn('BaseConfig.tokenRoot is deprecated. Use BaseConfig.accessTokenRoot instead.');
     this._tokenRoot = tokenRoot;
@@ -315,6 +355,9 @@ export class BaseConfig {
     return this._tokenRoot;
   }
 
+  /**
+   * @deprecated
+   */
   set tokenName(tokenName) {
     LogManager.getLogger('authentication').warn('BaseConfig.tokenName is deprecated. Use BaseConfig.accessTokenName instead.');
     this._tokenName = tokenName;
@@ -325,6 +368,9 @@ export class BaseConfig {
     return this._tokenName;
   }
 
+  /**
+   * @deprecated
+   */
   set tokenPrefix(tokenPrefix) {
     LogManager.getLogger('authentication').warn('BaseConfig.tokenPrefix is obsolete. Use BaseConfig.storageKey instead.');
     this._tokenPrefix = tokenPrefix;
@@ -334,20 +380,26 @@ export class BaseConfig {
     return this._tokenPrefix || 'aurelia';
   }
 
+  /**
+   * @deprecated
+   */
   get current() {
     LogManager.getLogger('authentication').warn('Getter BaseConfig.current is deprecated. Use BaseConfig directly instead.');
     return this;
   }
   set current(_) {
-    throw new Error('Setter BaseConfig.current is obsolete. Use BaseConfig directly instead.');
+    throw new Error('Setter BaseConfig.current has been removed. Use BaseConfig directly instead.');
   }
 
+  /**
+   * @deprecated
+   */
   get _current() {
     LogManager.getLogger('authentication').warn('Getter BaseConfig._current is deprecated. Use BaseConfig directly instead.');
     return this;
   }
   set _current(_) {
-    throw new Error('Setter BaseConfig._current is obsolete. Use BaseConfig directly instead.');
+    throw new Error('Setter BaseConfig._current has been removed. Use BaseConfig directly instead.');
   }
 }
 

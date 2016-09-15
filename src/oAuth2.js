@@ -48,8 +48,8 @@ export class OAuth2 {
     return openPopup
       .then(oauthData => {
         if (provider.responseType === 'token' ||
-            provider.responseType === 'id_token%20token' ||
-            provider.responseType === 'token%20id_token'
+            provider.responseType === 'id_token token' ||
+            provider.responseType === 'token id_token'
         ) {
           return oauthData;
         }
@@ -98,6 +98,37 @@ export class OAuth2 {
         query[paramName] = paramValue;
       });
     });
+    return query;
+  }
+
+  close(options) {
+    const provider  = extend(true, {}, this.defaults, options);
+    const url       = provider.logoutEndpoint + '?'
+                    + buildQueryString(this.buildLogoutQuery(provider));
+    const popup     = this.popup.open(url, provider.name, provider.popupOptions);
+    const openPopup = (this.config.platform === 'mobile')
+                    ? popup.eventListener(provider.postLogoutRedirectUri)
+                    : popup.pollPopup();
+
+    return openPopup
+      .then(response => {
+        return response;
+      });
+  }
+
+  buildLogoutQuery(provider) {
+    let query = {};
+    let authResponse = this.storage.get(this.config.storageKey);
+
+    if (provider.postLogoutRedirectUri) {
+      query.post_logout_redirect_uri = provider.postLogoutRedirectUri;
+    }
+    if (this.storage.get(provider.name + '_state')) {
+      query.state = this.storage.get(provider.name + '_state');
+    }
+    if (JSON.parse(authResponse).id_token) {
+      query.id_token_hint = JSON.parse(authResponse).id_token;
+    }
     return query;
   }
 }

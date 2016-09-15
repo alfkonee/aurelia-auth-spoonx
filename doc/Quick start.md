@@ -80,6 +80,13 @@ export function configure(aurelia) {
 }
 ```
 
+### Getting the current authentication status
+
+There are two options:
+
+* authService.isAuthenticated(): This function gets the current token on each call from the window storage to calucate the current authentication status. Since it's a function, Aurelia will use dirty checking, if you bind to it.
+* authService.authenticated: This property gets updated by timeout and storage events to keep it accurate all the time. No dirty-checking is needed, but you might not like that there is magic used to keep it updated.
+
 ### Provide a UI for a login, signup and profile
 
 Button actions are passed to the corresponding view model via a simple click.delegate:
@@ -151,7 +158,12 @@ The logout and profile links are only shown when the user is authenticated, wher
 ```html
 <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
     <ul class="nav navbar-nav">
-        <li repeat.for="row of router.navigation | authFilter: authenticated" class="${row.isActive ? 'active' : ''}">
+      <!--
+      You also can use isAuthenticated() and ensure the filter gets updated when
+      the token expires by using the binding signal 'authentication-change'.
+      repeat.for="row of router.navigation | authFilter: isAuthenticated  & signal: 'authentication-change
+      -->
+      <li repeat.for="row of router.navigation | authFilter: authenticated" class="${row.isActive ? 'active' : ''}">
             <a data-toggle="collapse" data-target="#bs-example-navbar-collapse-1.in" href.bind="row.href">${row.title}</a>
         </li>
     </ul>
@@ -160,6 +172,7 @@ The logout and profile links are only shown when the user is authenticated, wher
         <li><a href="/#/login">Login</a></li>
         <li><a href="/#/signup">Sign up</a></li>
     </ul>
+
     <ul if.bind="authenticated" class="nav navbar-nav navbar-right">
         <li><a href="/#/profile">Profile</a></li>
         <li><a href="/#/logout">Logout</a></li>

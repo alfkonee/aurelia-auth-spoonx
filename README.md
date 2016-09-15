@@ -12,54 +12,19 @@ You have multiple endpoints? No problem! In the recommended setting, aurelia-aut
 
 With aurelia-authentication you can:
 
-* Use local or third-party providers to authenticate the user
+* Use local login or third-party providers to authenticate the user
 * Automatically add your token to requests to the specified endpoints
 * Automatically refresh your token
 * Extensively customize the settings
 * Use standalone or in conjunction with [aurelia-api](https://github.com/SpoonX/aurelia-api)
+* Use [Auth0](https://auth0.com) as your only authentication provider (see [the relevant section](auth0.md) for more info)
+* Update valueConverters using the 'authorization-change' binding signal.
+* Subscribe to the 'authorization-change' event.
 * And more
 
 ## Important note
 
 We've simplified installation and usage! This plugin should now be installed using `jspm i aurelia-authentication` or (for webpack) `npm i aurelia-authentication --save`. Make sure you update all references to `spoonx/aurelia-authentication` and `spoonx/aurelia-api` and remove the `spoonx/` prefix (don't forget your config.js, package.json, imports and bundles).
-
-## Installation
-
-### Jspm/SytemJs
-
-Run `jspm i aurelia-authentication` from your project root.
-
-If install breaks your application, try resolving jspm forks: 
-
-```
-$ jspm inspect --forks
-$ jspm resolve --only registry:package-name@version
-```
-
-E.g. 
-
-```
-$ jspm inspect --forks
-     Installed Forks
-
-         npm:aurelia-dependency-injection 1.0.0-beta.1.2.3 1.0.0-beta.2.1.0
-         
-$ jspm resolve --only npm:aurelia-dependency-injection@1.0.0-beta.2.1.0
-```
-
-### Webpack
-
-Run `npm i aurelia-authentication` from your project root.
-
-Aurelia-authentication has submodules (currently only the authFilter). So you need to add it to the AureliaWebpackPlugin includeSubModules list.
-
-```js
-AureliaWebpackPlugin({
-    includeSubModules: [
-      { moduleId: 'aurelia-authentication' }
-    ]
-  }),
-```
 
 ## Documentation
 
@@ -67,11 +32,86 @@ You can find usage examples and the documentation at the [aurelia-authentication
 
 The [changelog](doc/changelog.md) provides you with information about important changes.
 
+## Installation
+
+### Aureli-Cli
+
+Run `npm i aurelia-authentication --save` from your project root.
+
+Aurelia-authentication needs an installation of [aurelia-api](https://www.npmjs.com/package/aurelia-api). It also has submodules (currently only the authFilter) and makes use of `extend` and `jwt-decode`. So, add following to the `build.bundles.dependencies` section of `aurelia-project/aurelia.json`.
+
+```js
+"dependencies": [
+  // ...
+  "extend",
+  {
+    "name": "aurelia-authentication",
+    "path": "../node_modules/aurelia-authentication/dist/amd",
+    "main": "aurelia-authentication"
+  },
+  {
+    "name": "jwt-decode",
+    "path": "../node_modules/jwt-decode/lib",
+    "main": "index"
+  }
+  // ...
+],
+```
+
+### Jspm
+
+Run `jspm i aurelia-authentication`
+
+Add `aurelia-authentication` to the `bundles.dist.aurelia.includes` section of `build/bundles.js`.
+
+Aurelia-authentication needs an installation of [aurelia-api](https://www.npmjs.com/package/aurelia-api). It also has submodules. They are imported in it's main file, so no further action is required.
+
+If the installation results in having forks, try resolving them by running:
+
+```sh
+jspm inspect --forks
+jspm resolve --only registry:package-name@version
+```
+
+E.g.
+
+```sh
+jspm inspect --forks
+>     Installed Forks
+>         npm:aurelia-dependency-injection 1.0.0-beta.1.2.3 1.0.0-beta.2.1.0
+
+jspm resolve --only npm:aurelia-dependency-injection@1.0.0-beta.2.1.0
+```
+
+### Webpack
+
+Run `npm i aurelia-authentication --save` from your project root.
+
+Add `'aurelia-authentication'` in the `coreBundles.aurelia section` of your `webpack.config.js`.
+
+Aurelia-authentication needs an [aurelia-api](https://www.npmjs.com/package/aurelia-api). It also has submodules. They are listed as resources in the package.json. So, no further action is required.
+
+### Typescript
+
+Npm-based installations pick up the typings automatically. For Jspm-based installations, add to your `typings.json`:
+
+```js
+"aurelia-authentication": "github:spoonx/aurelia-authentication",
+```
+
+and run `typings i`
+
+or run
+
+```sh
+typings i github:spoonx/aurelia-authentication
+```
+
 ## Usage
 
 ### Add a configuration file
 
-Set your custom configuration. You can find all options and the default values in the [baseConfig](http://aurelia-authentication.spoonx.org/baseConfig).
+Set your custom configuration. You can find all options and the default values in the [baseConfig](http://aurelia-authentication.spoonx.org/baseConfig.html).
 
 ```js
 /* authConfig.js */
@@ -118,7 +158,7 @@ export class Login {
 
     // use authService.login(credentialsObject) to login to your auth server
     // authService.authenticated holds the current status
-    // authService.getPayload() gives you the current payload object
+    // authService.getPayload() gives you the current payload object (for jwt)
     login(credentialsObject) {
       return this.authService.login(credentialsObject)
         .then(() => {
