@@ -30,13 +30,14 @@ Here is a sample of a close to minimal custom setting:
 ```js
 export default {
     endpoint: 'auth',
-    configureEndpoints: ['auth', 'protected-api']
+    configureEndpoints: ['auth', 'protected-api'],
     loginUrl: 'login',  
     signupUrl: 'users',
     profileUrl: 'me',
     unlinkUrl: 'me/unlink',
     loginOnSignup: false,
-    expiredRedirect: 1, // redirect to logoutRedirect after token expiration
+    storageChangedReload: true,    // ensure secondary tab reloading after auth status changes
+    expiredRedirect: 1,            // redirect to logoutRedirect after token expiration
     providers: {
         google: {
           url: 'google',
@@ -84,7 +85,7 @@ export function configure(aurelia) {
 
 There are two options:
 
-* authService.isAuthenticated(): This function gets the current token on each call from the window storage to calucate the current authentication status. Since it's a function, Aurelia will use dirty checking, if you bind to it.
+* authService.isAuthenticated(): This function gets the current token on each call from the window storage to calculate the current authentication status. Since it's a function, Aurelia will use dirty checking, if you bind to it.
 * authService.authenticated: This property gets updated by timeout and storage events to keep it accurate all the time. No dirty-checking is needed, but you might not like that there is magic used to keep it updated.
 
 ### Provide a UI for a login, signup and profile

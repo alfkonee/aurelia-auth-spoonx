@@ -1,3 +1,223 @@
+<a name="3.8.3"></a>
+## [3.8.3](https://github.com/spoonx/aurelia-authentication/compare/v3.8.2...v3.8.3) (2019-05-01)
+
+
+### Bug Fixes
+
+* **authService:** add tests ([dcf3b09](https://github.com/spoonx/aurelia-authentication/commit/dcf3b09))
+* **authService:** move IE relevant code higher ([3f428e1](https://github.com/spoonx/aurelia-authentication/commit/3f428e1))
+* **authService:** update internal authentication fields ([86620c0](https://github.com/spoonx/aurelia-authentication/commit/86620c0))
+
+
+
+<a name="3.8.2"></a>
+## [3.8.2](https://github.com/spoonx/aurelia-authentication/compare/v3.8.1...v3.8.2) (2018-09-24)
+
+
+### Bug Fixes
+
+* **auth0:** extend responseType check ([2d3434b](https://github.com/spoonx/aurelia-authentication/commit/2d3434b)), closes [#403](https://github.com/spoonx/aurelia-authentication/issues/403)
+* **auth0:** fix access and id token assignments ([9e2c383](https://github.com/spoonx/aurelia-authentication/commit/9e2c383)), closes [#397](https://github.com/spoonx/aurelia-authentication/issues/397)
+
+
+
+<a name="3.8.1"></a>
+## [3.8.1](https://github.com/spoonx/aurelia-authentication/compare/v3.8.0...v3.8.1) (2018-06-13)
+
+
+### Bug Fixes
+
+* **fetchClientConfig:** do not break promises chain ([c1cd0f2](https://github.com/spoonx/aurelia-authentication/commit/c1cd0f2))
+
+
+<a name="3.8.0"></a>
+# [3.8.0](https://github.com/spoonx/aurelia-authentication/compare/v3.7.1...v3.8.0) (2018-05-28)
+
+
+### Bug Fixes
+
+* **authService:** detect logout events in different tabs when using autoupdate of tokens. ([75029b2](https://github.com/spoonx/aurelia-authentication/commit/75029b2)), closes [#379](https://github.com/spoonx/aurelia-authentication/issues/379)
+* **authService:** limit setTimeout to it's maximum value of about ca 24.85d ([3c51df6](https://github.com/spoonx/aurelia-authentication/commit/3c51df6)), closes [#375](https://github.com/spoonx/aurelia-authentication/issues/375)
+* **authService:** use proper update method ([0283882](https://github.com/spoonx/aurelia-authentication/commit/0283882))
+* **baseConfig:** logoutOnInvalidtoken -> logoutOnInvalidToken ([16bb54b](https://github.com/spoonx/aurelia-authentication/commit/16bb54b))
+* **index:** use PLATFORM.moduleName for globalResources ([ec84731](https://github.com/spoonx/aurelia-authentication/commit/ec84731))
+
+
+### Features
+
+* **authentication:** add option to always store all received properties ([be7c530](https://github.com/spoonx/aurelia-authentication/commit/be7c530))
+* **authService:** added getIdTokenPayload method ([0651f00](https://github.com/spoonx/aurelia-authentication/commit/0651f00))
+* **baseConfig:** added azure ad configuration ([554da43](https://github.com/spoonx/aurelia-authentication/commit/554da43))
+
+
+
+<a name="3.7.0"></a>
+# [3.7.0](https://github.com/spoonx/aurelia-authentication/compare/v3.6.0...v3.7.0) (2017-06-29)
+
+
+### Bug Fixes
+
+* **authentication:** prevent logout if there is no identity ([aea4ac8](https://github.com/spoonx/aurelia-authentication/commit/aea4ac8))
+* **authService:** redirect on refresh token failure when configured to do so ([f23fd60](https://github.com/spoonx/aurelia-authentication/commit/f23fd60))
+
+
+### BREAKING CHANGES
+
+* authentication: authentication failures on 401 now return the response in the rejection.
+
+
+
+<a name="3.6.0"></a>
+# [3.6.0](https://github.com/spoonx/aurelia-authentication/compare/v3.5.0...v3.6.0) (2017-05-05)
+
+
+### Features
+
+* **fetchClientConfig:** logout when token is invalidated by server ([ad9b66a](https://github.com/spoonx/aurelia-authentication/commit/ad9b66a))
+
+
+
+<a name="3.5.0"></a>
+# [3.5.0](https://github.com/spoonx/aurelia-authentication/compare/v3.4.1...v3.5.0) (2017-04-25)
+
+
+### Features
+
+* **authService:** add default headers and clientSecret in config ([863e4a4](https://github.com/spoonx/aurelia-authentication/commit/863e4a4))
+
+
+
+<a name="3.4.1"></a>
+## [3.4.1](https://github.com/spoonx/aurelia-authentication/compare/v3.4.0...v3.4.1) (2017-03-23)
+
+
+### Bug Fixes
+
+* **authService:** storageEventHandler change ([01d3662](https://github.com/spoonx/aurelia-authentication/commit/01d3662))
+
+
+
+<a name="3.4.0"></a>
+# [3.4.0](https://github.com/spoonx/aurelia-authentication/compare/v3.3.0...v3.4.0) (2017-03-20)
+
+
+### Features
+
+* **authService:** support empty login request ([0d8f258](https://github.com/spoonx/aurelia-authentication/commit/0d8f258))
+
+
+
+<a name="3.3.0"></a>
+# [3.3.0](https://github.com/spoonx/aurelia-authentication/compare/v3.2.0...v3.3.0) (2017-03-06)
+
+
+### Bug Fixes
+
+* **authService:** handle logout also if server logoutUrl fails ([403a498](https://github.com/spoonx/aurelia-authentication/commit/403a498))
+
+
+### Features
+
+* **authentication:** include response object in 'Token not found in response' errors ([d5131ca](https://github.com/spoonx/aurelia-authentication/commit/d5131ca))
+
+
+
+<a name="3.2.0"></a>
+# [3.2.0](https://github.com/spoonx/aurelia-authentication/compare/v3.1.0...v3.2.0) (2017-01-13)
+
+
+### Bug Fixes
+
+* **authService:** allow object passed as second arg to authService.login() ([da294c4](https://github.com/spoonx/aurelia-authentication/commit/da294c4))
+* **interceptor:** fix automatic refresh token usage ([62d61de](https://github.com/spoonx/aurelia-authentication/commit/62d61de))
+
+
+
+<a name="3.1.0"></a>
+# [3.1.0](https://github.com/spoonx/aurelia-authentication/compare/v3.0.3...v3.1.0) (2016-11-02)
+
+
+### Bug Fixes
+
+* **auth0:** Close popup after an unrecoverable error ([36aa441](https://github.com/spoonx/aurelia-authentication/commit/36aa441))
+* **auth0:** Fix auth rejection for non severe errors ([9a91ef2](https://github.com/spoonx/aurelia-authentication/commit/9a91ef2))
+
+
+### Features
+
+* **authService:** Add focus handler to check token expiration ([38381c3](https://github.com/spoonx/aurelia-authentication/commit/38381c3))
+* **authService:** changed redirection overwrite to empty string ([cc8b79e](https://github.com/spoonx/aurelia-authentication/commit/cc8b79e))
+* **authService:** optional callback for isAuthenticated ([fdbe4b5](https://github.com/spoonx/aurelia-authentication/commit/fdbe4b5))
+
+
+
+<a name="3.0.3"></a>
+## [3.0.3](https://github.com/spoonx/aurelia-authentication/compare/v3.0.2...v3.0.3) (2016-10-14)
+
+
+### Bug Fixes
+
+* **baseConfig:** explain getExpirationDateFromResponse and ensure format ([ee30ce4](https://github.com/spoonx/aurelia-authentication/commit/ee30ce4))
+* **isAuthenticated:** always check access_token existence ([72fb377](https://github.com/spoonx/aurelia-authentication/commit/72fb377))
+
+
+
+<a name="3.0.2"></a>
+## [3.0.2](https://github.com/spoonx/aurelia-authentication/compare/v3.0.1...v3.0.2) (2016-10-14)
+
+
+### Bug Fixes
+
+* **authService:** storageChangedReload  optional (default: false) ([8c5b1cb](https://github.com/spoonx/aurelia-authentication/commit/8c5b1cb))
+
+
+
+<a name="3.0.1"></a>
+## [3.0.1](https://github.com/spoonx/aurelia-authentication/compare/3.0.0...v3.0.1) (2016-10-13)
+
+
+### Bug Fixes
+
+* **authServive:** fix ie11 storage event loop ([b9ce956](https://github.com/spoonx/aurelia-authentication/commit/b9ce956))
+
+
+### Features
+
+* **authService:** ensure page reload after storage events ([7125cc5](https://github.com/spoonx/aurelia-authentication/commit/7125cc5))
+
+
+
+<a name="3.0.0"></a>
+# [3.0.0](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc10...v3.0.0) (2016-10-05)
+
+
+### Bug Fixes
+
+* **authService:** storage events do not work properly in IE11 ([944a716](https://github.com/spoonx/aurelia-authentication/commit/944a716))
+
+
+### Features
+
+* **auth0lock:** Upgrade code to work with Auth0 Lock 10.x (no backwards compat) ([fe3adc7](https://github.com/spoonx/aurelia-authentication/commit/fe3adc7))
+* **authService:** add logout handling for openid connect ([91e9217](https://github.com/spoonx/aurelia-authentication/commit/91e9217))
+
+
+
+<a name="3.0.0-rc11"></a>
+# [3.0.0-rc11](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc10...v3.0.0-rc11) (2016-09-22)
+
+
+### Bug Fixes
+
+* **authService:** storage events do not work properly in IE11 ([944a716](https://github.com/spoonx/aurelia-authentication/commit/944a716))
+
+
+### Features
+
+* **authService:** add logout handling for openid connect ([91e9217](https://github.com/spoonx/aurelia-authentication/commit/91e9217))
+
+
+
 <a name="3.0.0-rc10"></a>
 # [3.0.0-rc10](https://github.com/spoonx/aurelia-authentication/compare/3.0.0-rc9...v3.0.0-rc10) (2016-08-25)
 

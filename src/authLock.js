@@ -6,27 +6,25 @@ import {BaseConfig} from './baseConfig';
 
 @inject(Storage, BaseConfig)
 export class AuthLock {
-  constructor(storage, config) {
-    this.storage      = storage;
-    this.config       = config;
-    this.defaults     = {
-      name: null,
-      state: null,
-      scope: null,
-      scopeDelimiter: null,
-      redirectUri: null,
-      clientId: null,
-      clientDomain: null,
-      display: 'popup',
-      lockOptions: {
-        popup: true
-      },
-      popupOptions: null,
-      responseType: 'token'
+  constructor(storage: Storage, config: BaseConfig) {
+    this.storage  = storage;
+    this.config   = config;
+    this.defaults = {
+      name          : null,
+      state         : null,
+      scope         : null,
+      scopeDelimiter: ' ',
+      redirectUri   : null,
+      clientId      : null,
+      clientDomain  : null,
+      display       : 'popup',
+      lockOptions   : {},
+      popupOptions  : null,
+      responseType  : 'token'
     };
   }
 
-  open(options, userData) {
+  open(options: {}, userData?: {}): Promise<any> {
     // check pre-conditions
     if (typeof PLATFORM.global.Auth0Lock !== 'function') {
       throw new Error('Auth0Lock was not found in global scope. Please load it before using this provider.');
@@ -40,34 +38,62 @@ export class AuthLock {
       this.storage.set(stateName, provider.state);
     }
 
-    this.lock = this.lock || new PLATFORM.global.Auth0Lock(provider.clientId, provider.clientDomain);
+    // transform provider options into auth0-lock options
+    let opts = {
+      auth: {
+        params: {}
+      }
+    };
+
+    if (Array.isArray(provider.scope) && provider.scope.length) {
+      opts.auth.params.scope = provider.scope.join(provider.scopeDelimiter);
+    }
+    if (provider.state) {
+      opts.auth.params.state = this.storage.get(provider.name + '_state');
+    }
+    if (provider.display === 'popup') {
+      opts.auth.redirect = false;
+    } else if (typeof provider.redirectUri === 'string') {
+      opts.auth.redirect = true;
+      opts.auth.redirectUrl = provider.redirectUri;
+    }
+    if (typeof provider.popupOptions === 'object') {
+      opts.popupOptions = provider.popupOptions;
+    }
+    if (typeof provider.responseType === 'string') {
+      opts.auth.responseType = provider.responseType;
+    }
+    let lockOptions = extend(true, {}, provider.lockOptions, opts);
+
+    this.lock = this.lock || new PLATFORM.global.Auth0Lock(provider.clientId, provider.clientDomain, lockOptions);
 
     const openPopup = new Promise((resolve, reject) => {
-      let opts = provider.lockOptions;
-      opts.popupOptions = provider.popupOptions;
-      opts.responseType = provider.responseType;
-      opts.callbackURL = provider.redirectUri;
-      opts.authParams = opts.authParams || {};
-      if (provider.scope) opts.authParams.scope = provider.scope;
-      if (provider.state) opts.authParams.state = this.storage.get(provider.name + '_state');
-
-      this.lock.show(provider.lockOptions, (err, profile, tokenOrCode) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({
-            //NOTE: this is an id token (JWT) and it shouldn't be named access_token
-            access_token: tokenOrCode
-          });
+      this.lock.on('authenticated', authResponse => {
+        if (!lockOptions.auth.redirect) {
+          // hides the lock popup, as it doesn't do so automatically
+          this.lock.hide();
         }
+        resolve({
+          access_token: authResponse.accessToken,
+          id_token    : authResponse.idToken
+        });
       });
+      this.lock.on('unrecoverable_error', err => {
+        if (!lockOptions.auth.redirect) {
+          // hides the lock popup, as it doesn't do so automatically
+          this.lock.hide();
+        }
+        reject(err);
+      });
+      this.lock.show();
     });
 
     return openPopup
       .then(lockResponse => {
-        if (provider.responseType === 'token' ||
-            provider.responseType === 'id_token%20token' ||
-            provider.responseType === 'token%20id_token'
+        if (provider.responseType === 'token'
+          || provider.responseType === 'id_token%20token'
+          || provider.responseType === 'token%20id_token'
+          || provider.responseType === 'token id_token'
         ) {
           return lockResponse;
         }

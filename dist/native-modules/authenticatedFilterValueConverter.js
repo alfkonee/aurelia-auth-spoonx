@@ -1,11 +1,19 @@
+'use strict';
+
+exports.__esModule = true;
+exports.AuthenticatedFilterValueConverter = undefined;
+
 var _dec, _class;
 
+var _aureliaDependencyInjection = require('aurelia-dependency-injection');
+
+var _aureliaAuthentication = require('./aurelia-authentication');
+
+var _aureliaRouter = require('aurelia-router');
 
 
-import { inject } from 'aurelia-dependency-injection';
-import { AuthService } from './aurelia-authentication';
 
-export var AuthenticatedFilterValueConverter = (_dec = inject(AuthService), _dec(_class = function () {
+var AuthenticatedFilterValueConverter = exports.AuthenticatedFilterValueConverter = (_dec = (0, _aureliaDependencyInjection.inject)(_aureliaAuthentication.AuthService), _dec(_class = function () {
   function AuthenticatedFilterValueConverter(authService) {
     
 
@@ -13,7 +21,7 @@ export var AuthenticatedFilterValueConverter = (_dec = inject(AuthService), _dec
   }
 
   AuthenticatedFilterValueConverter.prototype.toView = function toView(routes) {
-    var isAuthenticated = arguments.length <= 1 || arguments[1] === undefined ? this.authService.authenticated : arguments[1];
+    var isAuthenticated = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.authService.authenticated;
 
     return routes.filter(function (route) {
       return typeof route.config.auth !== 'boolean' || route.config.auth === isAuthenticated;

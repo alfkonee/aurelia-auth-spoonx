@@ -6,6 +6,41 @@ import {AuthService} from 'aurelia-authentication';
 
 ----------
 
+## Binding signals
+
+----------
+
+### authentication-change
+
+Whenever the authentication status changes, a binding signal 'authentication-change' is emitted.
+
+Example:
+
+```html
+<div>Time: ${logTime | timeConverter & signal:'authentication-change'}</div>
+```
+
+----------
+
+## EventAggregator
+
+----------
+
+### authentication-change
+
+Whenever the authentication status changes, the new status is published with the EventAggregator on the 'authentication-change' channel. 
+
+Example:
+
+```js
+  this.eventAggregator.subscribe('authentication-change', authenticated => {
+    // your code
+  });
+```
+
+----------
+
+
 ## Properties
 
 ----------
@@ -60,6 +95,8 @@ Sets the login timeout.
 
 CAUTION: .authenticated and isAuthenticated() might get different results when set manually.
 
+WARNING: Maximum timeout is 2^31 - 1 ms (ca. 24.85d).
+
 #### Parameters
 
 | Parameter | Type     | Description        |
@@ -110,9 +147,9 @@ Retrieves (GET) the profile from the BaseConfig.profileUrl. Accepts criteria. If
 
 #### Parameters
 
-| Parameter | Type                      | Description                           |
-| --------- | ------------------------- | ------------------------------------- |
-| criteria  | {[{} / number ´/ string]} | An ID, or object of supported filters |
+| Parameter | Type                     | Description                           |
+| --------- | ------------------------ | ------------------------------------- |
+| criteria  | {[{} | number | string]} | An ID, or object of supported filters |
 
 #### Returns
 
@@ -138,7 +175,7 @@ Updates the profile to the BaseConfig.profileUrl using BaseConfig.profileMethod 
 | Parameter | Type                     | Description                           |
 | --------- | ------------------------ | ------------------------------------- |
 | body      | {}                       | The body                              |
-| criteria  | [{} / number / string]   | An ID, or object of supported filters |
+| criteria  | [{} | number | string]   | An ID, or object of supported filters |
 
 #### Returns
 
@@ -187,11 +224,17 @@ let currentToken = this.authService.getRefreshToken();
 
 ----------
 
-### .isAuthenticated()
+### .isAuthenticated(callback)
 
 Checks if there is a (valid) token in storage. If the token is isExpired and  BaseConfig.autoUpdateToken===true, it returns true and a new access token automatically requested using the refesh_token. If you use it in a getter, aurelia will dirty check on uodates. Hence, may better either use .authenticated or use the binding signal 'authentication-change' to ensure udpdates.
 
 CAUTION: When you cancel or manually set the timeout, .isAuthenticated and .authenticated could yield different results.
+
+#### Parameters
+
+| Parameter  | Type                             | Description                                              |
+| ---------- | -------------------------------- | -------------------------------------------------------- |
+| [callback] | (authenticated: boolean) => void | optional callback executed once the status is determined |
 
 #### Returns
 
@@ -273,7 +316,23 @@ A `Object` for JWT or `null` for other tokens.
 #### Example
 
 ```js
-let isExpired = this.authService.getTokenPayload();
+let payload = this.authService.getTokenPayload();
+```
+
+----------
+
+### .getIdTokenPayload()
+
+Gets the current id token payload from storage
+
+#### Returns
+
+A `Object` for JWT or `null` for other tokens.
+
+#### Example
+
+```js
+let payload = this.authService.getIdTokenPayload();
 ```
 
 ----------
@@ -309,7 +368,7 @@ Signup locally using BaseConfig.signupUrl either with credentials strings or an 
 | email         | string                  | Passed on as email: email                            |
 | password      | string                  | Passed on as password: password                      |
 | [options]     | [{}]                    | Options object passed to aurelia-api                 |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| [redirectUri] | [string]                | redirectUri overwrite. '' = no redirection           |
 
 #### Parameters v2
 
@@ -317,7 +376,7 @@ Signup locally using BaseConfig.signupUrl either with credentials strings or an 
 | ------------- | ----------------------- | ---------------------------------------------------- |
 | credentials   | {}                      | Passed on credentials object                         |
 | [options]     | [{}]                    | Options object passed to aurelia-api                 |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| [redirectUri] | [string]                | redirectUri overwrite. '' = no redirection           |
 
 #### Returns
 
@@ -358,7 +417,7 @@ Login locally using BaseConfig.loginUrl either with credentials strings or an ob
 | email         | string                  | Passed on as email: email                            |
 | password      | string                  | Passed on as password: password                      |
 | [options]     | [{}]                    | Options object passed to aurelia-api                 |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| [redirectUri] | [string]                | redirectUri overwrite. '' = no redirection           |
 
 #### Parameters v2
 
@@ -366,7 +425,7 @@ Login locally using BaseConfig.loginUrl either with credentials strings or an ob
 | ------------- | ----------------------- | ---------------------------------------------------- |
 | credentials   | {}                      | Passed on credentials object                         |
 | [options]     | [{}]                    | Options object passed to aurelia-api                 |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| [redirectUri] | [string]                | redirectUri overwrite. '' = no redirection           |
 
 #### Returns
 
@@ -402,15 +461,17 @@ this.authService.login({
 
 ----------
 
-### .logout([redirectUri])
+### .logout([redirectUri [, query [, name]]])
 
 Logout locally by deleting the authentication information from the storage. Redirects to BaseConfig.logoutRedirect if set. The redirectUri parameter overwrites the BaseConfig.logoutRedirect setting. Set to 0 it prevents redirection. Set to a string, will redirect there. If BaseConfig.logoutUrl is set, a logout request is send to the server first using the BaseConfig.logoutMethod.
 
 #### Parameters
 
-| Parameter     | Type                    | Description                                          |
-| ------------- | ----------------------- | ---------------------------------------------------- |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| Parameter     | Type      | Description                                 |
+| ------------- | --------- | ------------------------------------------- |
+| [redirectUri] | [string]  | redirectUri overwrite. '' = no redirection  |
+| [query]       | [string]  | optional query string for the uri           |
+| [name]        | [string]  | optional provider logout and state checking |
 
 #### Returns
 
@@ -438,11 +499,11 @@ Authenticate with third-party with the BaseConfig.providers settings. The login 
 
 #### Parameters
 
-| Parameter     | Type                    | Description                                          |
-| ------------- | ----------------------- | ---------------------------------------------------- |
-| provider      | string                  | Provider name of BaseConfig.providers                |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
-| [userData]    | [{}]                    | userData object passed to provider                   |
+| Parameter     | Type      | Description                                |
+| ------------- | --------- | ------------------------------------------ |
+| provider      | string    | Provider name of BaseConfig.providers      |
+| [redirectUri] | [string]  | redirectUri overwrite. '' = no redirection |
+| [userData]    | [{}]      | userData object passed to provider         |
 
 #### Returns
 
@@ -463,10 +524,10 @@ Unlink third-party with the BaseConfig.providers settings. Optionally redirects 
 
 #### Parameters
 
-| Parameter     | Type                    | Description                                          |
-| ------------- | ----------------------- | ---------------------------------------------------- |
-| provider      | string                  | Provider name of BaseConfig.providers                |
-| [redirectUri] | [string/0/null/undef ]  | redirectUri overwrite. 0=off, null/undef=use default |
+| Parameter     | Type      | Description                                |
+| ------------- | --------- | ------------------------------------------ |
+| provider      | string    | Provider name of BaseConfig.providers      |
+| [redirectUri] | [string]  | redirectUri overwrite. '' = no redirection |
 
 #### Returns
 
@@ -482,5 +543,3 @@ this.authService.unlink('facebook', '#/facebook-post-unlink')
 ```
 
 ----------
-
-*Note*: The redirectUri options might seem unusual. This is to provide backwards compatibility.

@@ -22,19 +22,15 @@ With aurelia-authentication you can:
 * Subscribe to the 'authorization-change' event.
 * And more
 
-## Important note
-
-We've simplified installation and usage! This plugin should now be installed using `jspm i aurelia-authentication` or (for webpack) `npm i aurelia-authentication --save`. Make sure you update all references to `spoonx/aurelia-authentication` and `spoonx/aurelia-api` and remove the `spoonx/` prefix (don't forget your config.js, package.json, imports and bundles).
-
 ## Documentation
 
 You can find usage examples and the documentation at the [aurelia-authentication-docs](http://aurelia-authentication.spoonx.org/).
 
-The [changelog](doc/changelog.md) provides you with information about important changes.
+The [changelog](doc/CHANGELOG.md) provides you with information about important changes.
 
 ## Installation
 
-### Aureli-Cli
+### Aurelia-Cli
 
 Run `npm i aurelia-authentication --save` from your project root.
 
@@ -87,7 +83,23 @@ jspm resolve --only npm:aurelia-dependency-injection@1.0.0-beta.2.1.0
 
 Run `npm i aurelia-authentication --save` from your project root.
 
-Add `'aurelia-authentication'` in the `coreBundles.aurelia section` of your `webpack.config.js`.
+The `authFilter` needs to be added to the `webpack.config.js`.
+
+Run `npm i ModuleDependenciesPlugin --save-dev` from your root project and include it the `webpack.config.js`, eg:
+
+```js
+const { AureliaPlugin, ModuleDependenciesPlugin  } = require('aurelia-webpack-plugin');`
+```
+
+In the `plugins` section add the `authFilter`, eg:
+
+```js
+  plugins: [
+    new AureliaPlugin(),
+    new ModuleDependenciesPlugin({
+      "aurelia-authentication": [ "./authFilterValueConverter" ],
+    }),
+```
 
 Aurelia-authentication needs an [aurelia-api](https://www.npmjs.com/package/aurelia-api). It also has submodules. They are listed as resources in the package.json. So, no further action is required.
 
@@ -117,10 +129,11 @@ Set your custom configuration. You can find all options and the default values i
 /* authConfig.js */
 var baseConfig = {
     endpoint: 'auth',             // use 'auth' endpoint for the auth server
-    configureEndpoints: ['auth']  // add Authorization header to 'auth' endpoint
+    configureEndpoints: ['auth'], // add Authorization header to 'auth' endpoint
     facebook: {
         clientId: 'your client id' // set your third-party providers client ids
     }
+}
 ```
 
 ### Configure the plugin
@@ -194,31 +207,35 @@ authService
   // the current authentication status
   .authenticated
   // signup into server with credentials and optionally logs in
-  .signup(credentials: Object[, RequestObtions: Object[, redirectUri: string]]): Promise<Response>
-   // log into server with credentials. Stores response if successful
-  .login(credentials: Object[, RequestObtions: Object[, redirectUri: string]]): Promise<Response>
-  // deletes stored response. Sends optionally a logout request
-  .logout([redirectUri: string]): Promise<>|Promise<Response>
+  signup(displayNameOrCredentials, emailOrOptions, passwordOrRedirectUri, options, redirectUri)
+  // log into server with credentials. Stores response if successful
+  login(emailOrCredentials, passwordOrOptions, optionsOrRedirectUri, redirectUri)
+  // deletes stored response. If configured in the config, sends optionally a logout request. 
+  logout(redirectUri, query, name)
   // manually refresh authentication. Needs refreshToken options to be configured
-  .updateToken(): Promise<Response> {
+  .updateToken()
   // link third-party account or log into server via third-party authentication. Stores response if successful
-  .authenticate(provider: string[, redirectUri: string][, userData: Object]): Promise<Response>
+  authenticate(name, redirectUri, userData)
   // unlink third-party
-  .unlink(provider: string): Promise<Response>
+  unlink(name, redirectUri)
   // get profile
-  .getMe([criteria: Object|string|number]): Promise<Response>
+  .getMe(criteriaOrId)
   // update profile
-  .updateMe(data: Object[,criteria: Object|string|number]): Promise<Response>
+  .updateMe(body, criteriaOrId)
   // check if token is available and, if applicable, not expired
-  .isAuthenticated(): boolean
+  .isAuthenticated()
   // get token payload if available
-  .getTokenPayload(): Object
+  .getTokenPayload()
   // get the token ttl if available
-  .getTtl(): Number
+  .getTtl()
   // get the token exp if available
-  .getExp(): Number
+  .getExp()
 ```
 
 Additionally, you can use `AuthFilterValueConverter` and `AuthenticatedStep` for UI feedback.
 
 You can find more information in the [aurelia-authentication-docs](http://aurelia-authentication.spoonx.org/).
+
+## Note
+
+Some month ago, we've simplified installation and usage! This plugin should now be installed using `jspm i aurelia-authentication` or (for webpack) `npm i aurelia-authentication --save`. Make sure you update all references to `spoonx/aurelia-authentication` and `spoonx/aurelia-api` and remove the `spoonx/` prefix (don't forget your config.js, package.json, imports and bundles).

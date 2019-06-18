@@ -1,47 +1,50 @@
-import * as LogManager from 'aurelia-logging';
 import {PLATFORM,DOM} from 'aurelia-pal';
 import {parseQueryString,join,buildQueryString} from 'aurelia-path';
-import {inject} from 'aurelia-dependency-injection';
+import {getLogger} from 'aurelia-logging';
+import {inject,Container} from 'aurelia-dependency-injection';
 import {deprecated} from 'aurelia-metadata';
 import {EventAggregator} from 'aurelia-event-aggregator';
 import {BindingSignaler} from 'aurelia-templating-resources';
-import {Redirect} from 'aurelia-router';
+import {Rest,Config} from 'aurelia-api';
+import {Redirect,RouteConfig} from 'aurelia-router';
 import {HttpClient} from 'aurelia-fetch-client';
-import {Config,Rest} from 'aurelia-api';
 
 export declare class Popup {
   constructor();
-  open(url?: any, windowName?: any, options?: any): any;
-  eventListener(redirectUri?: any): any;
-  pollPopup(): any;
+  open(url: string, windowName: string, options?: {}): Popup;
+  eventListener(redirectUri: string): Promise<any>;
+  pollPopup(): Promise<any>;
 }
+export declare const logger: any;
+
+/* eslint-disable max-lines */
 export declare class BaseConfig {
   
   /**
      * Prepends baseUrl to a given url
-     * @param  {String} url The relative url to append
-     * @return {String}     joined baseUrl and url
+     * @param  {string} url The relative url to append
+     * @return {string}     joined baseUrl and url
      */
-  joinBase(url?: any): any;
+  joinBase(url: string): string;
   
   /**
-     * Merge current settings with incomming settings
-     * @param  {Object} incomming Settings object to be merged into the current configuration
-     * @return {Config}           this
+     * Merge current settings with incoming settings
+     * @param  {Object} incoming Settings object to be merged into the current configuration
      */
-  configure(incomming?: any): any;
+  configure(incoming: {}): Config;
+  getOptionsForTokenRequests(options?: {}): {};
   
   /* ----------- default  config ----------- */
   // Used internally. The used Rest instance; set during configuration (see index.js)
-  client: any;
+  client: Rest;
   
   // If using aurelia-api:
   // =====================
   // This is the name of the endpoint used for any requests made in relation to authentication (login, logout, etc.). An empty string selects the default endpoint of aurelia-api.
-  endpoint: any;
+  endpoint: string;
   
   // When authenticated, these endpoints will have the token added to the header of any requests (for authorization). Accepts an array of endpoint names. An empty string selects the default endpoint of aurelia-api.
-  configureEndpoints: any;
+  configureEndpoints: Array<string>;
   
   // SPA related options
   // ===================
@@ -107,6 +110,9 @@ export declare class BaseConfig {
   // The token name used in the header of API requests that require authentication
   authTokenType: any;
   
+  // Logout when the token is invalidated by the server
+  logoutOnInvalidToken: any;
+  
   // The the property from which to get the access token after a successful login or signup. Can also be dotted eg "accessTokenProp.accessTokenName"
   accessTokenProp: any;
   
@@ -129,8 +135,17 @@ export declare class BaseConfig {
   // Oauth Client Id
   clientId: any;
   
+  // Oauth Client secret
+  clientSecret: any;
+  
   // The the property from which to get the refresh token after a successful token refresh. Can also be dotted eg "refreshTokenProp.refreshTokenProp"
   refreshTokenProp: any;
+  
+  // The property name used to send the existing token when refreshing `{ "refreshTokenSubmitProp": '...' }`
+  refreshTokenSubmitProp: any;
+  
+  // Option to maintain unchanged response properties This allows to work with a single refresh_token that was received once and the expiration only is extend
+  keepOldResponseProperties: any;
   
   // If the property defined by `refreshTokenProp` is an object:
   // -----------------------------------------------------------
@@ -167,23 +182,26 @@ export declare class BaseConfig {
   // The key used for storing the authentication response locally
   storageKey: any;
   
-  // optional function to extract the expiration date. takes the server response as parameter
-  // eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() + serverResponse.expires_in * 1000;
+  // full page reload if authorization changed in another tab (recommended to set it to 'true')
+  storageChangedReload: any;
+  
+  // optional function to extract the expiration date. Takes the server response as parameter and returns NumericDate = number of seconds! since 1 January 1970 00:00:00 UTC (Unix Epoch)
+  // eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() / 1000 + serverResponse.expires_in;
   getExpirationDateFromResponse: any;
   
-  // optional function to extract the access token from the response. takes the server response as parameter
+  // optional function to extract the access token from the response. Takes the server response as parameter and returns a token
   // eg: getAccessTokenFromResponse = serverResponse => serverResponse.data[0].access_token;
   getAccessTokenFromResponse: any;
   
-  // optional function to extract the refresh token from the response. takes the server response as parameter
+  // optional function to extract the refresh token from the response. Takes the server response as parameter and returns a token
   // eg: getRefreshTokenFromResponse = serverResponse => serverResponse.data[0].refresh_token;
   getRefreshTokenFromResponse: any;
   
   // List of value-converters to make global
   globalValueConverters: any;
   
-  //OAuth provider specific related configuration
-  // ============================================
+  // Default headers for login and token-update endpoint
+  defaultHeadersForTokenRequests: any;
   providers: any;
   authToken: any;
   responseTokenProp: any;
@@ -195,30 +213,100 @@ export declare class BaseConfig {
      * @deprecated
      */
   current: any;
+  logoutOnInvalidtoken: any;
 }
 export declare class Storage {
-  constructor(config?: any);
-  get(key?: any): any;
-  set(key?: any, value?: any): any;
-  remove(key?: any): any;
+  constructor(config: BaseConfig);
+  get(key: string): string;
+  set(key: string, value: string): any;
+  remove(key: string): any;
 }
 export declare class AuthLock {
-  constructor(storage?: any, config?: any);
-  open(options?: any, userData?: any): any;
+  constructor(storage: Storage, config: BaseConfig);
+  open(options: {}, userData?: {}): Promise<any>;
 }
 export declare class OAuth1 {
-  constructor(storage?: any, popup?: any, config?: any);
-  open(options?: any, userData?: any): any;
-  exchangeForToken(oauthData?: any, userData?: any, provider?: any): any;
+  constructor(storage: Storage, popup: Popup, config: BaseConfig);
+  open(options: {}, userData: {}): Promise<any>;
+  exchangeForToken(oauthData: {}, userData: {}, provider: string): Promise<any>;
 }
+
+/**
+ * OAuth2 service class
+ *
+ * @export
+ * @class OAuth2
+ */
 export declare class OAuth2 {
-  constructor(storage?: any, popup?: any, config?: any);
-  open(options?: any, userData?: any): any;
-  exchangeForToken(oauthData?: any, userData?: any, provider?: any): any;
-  buildQuery(provider?: any): any;
+  
+  /**
+     * Creates an instance of OAuth2.
+     *
+     * @param {Storage} storage The Storage instance
+     * @param {Popup}   popup   The Popup instance
+     * @param {Config}  config  The Config instance
+     *
+     * @memberOf OAuth2
+     */
+  constructor(storage: Storage, popup: Popup, config: BaseConfig);
+  
+  /**
+     * Open OAuth2 flow
+     *
+     * @param {{}} options  OAuth2 and dialog options
+     * @param {{}} userData Extra data for the authentications server
+     * @returns {Promise<any>} Authentication server response
+     *
+     * @memberOf OAuth2
+     */
+  open(options: {}, userData: {}): Promise<any>;
+  
+  /**
+     * Exchange the code from the external provider by a token from the authentication server
+     *
+     * @param {{}} oauthData The oauth data from the external provider
+     * @param {{}} userData Extra data for the authentications server
+     * @param {string} provider The name of the provider
+     * @returns {Promise<any>} The authenticaion server response with the token
+     *
+     * @memberOf OAuth2
+     */
+  exchangeForToken(oauthData: {}, userData: {}, provider: string): Promise<any>;
+  
+  /**
+     * Create the query string for a provider
+     *
+     * @param {string} provider The provider name
+     * @returns {string} The resulting query string
+     *
+     * @memberOf OAuth2
+     */
+  buildQuery(provider: string): string;
+  
+  /**
+     * Send logout request to oath2 rpovider
+     *
+     * @param {[{}]} options Logout option
+     * @returns {Promise<any>} The OAuth provider response
+     *
+     * @memberOf OAuth2
+     */
+  close(options?: {}): Promise<any>;
+  
+  /**
+     * Build query for logout request
+     *
+     * @param {string} provider The rpovider name
+     * @returns {string} The logout query string
+     *
+     * @memberOf OAuth2
+     */
+  buildLogoutQuery(provider: string): string;
 }
+
+/* eslint-disable max-lines */
 export declare class Authentication {
-  constructor(storage?: any, config?: any, oAuth1?: any, oAuth2?: any, auth0Lock?: any);
+  constructor(storage: Storage, config: BaseConfig, oAuth1: OAuth1, oAuth2: OAuth2, auth0Lock: AuthLock);
   
   /* deprecated methods */
   getLoginRoute(): any;
@@ -227,42 +315,78 @@ export declare class Authentication {
   getSignupUrl(): any;
   getProfileUrl(): any;
   getToken(): any;
-  responseObject: any;
-  hasDataStored: any;
+  responseObject: {};
+  hasDataStored: boolean;
   
   /* get/set responseObject */
-  getResponseObject(): any;
-  setResponseObject(response?: any): any;
+  getResponseObject(): {};
+  setResponseObject(response: {}): any;
   
   /* get data, update if needed first */
-  getAccessToken(): any;
-  getRefreshToken(): any;
-  getIdToken(): any;
-  getPayload(): any;
-  getExp(): any;
+  getAccessToken(): string;
+  getRefreshToken(): string;
+  getIdToken(): string;
+  getPayload(): {};
+  getIdPayload(): {};
+  getExp(): number;
   
   /* get status from data */
-  getTtl(): any;
-  isTokenExpired(): any;
-  isAuthenticated(): any;
+  getTtl(): number;
+  isTokenExpired(): boolean;
+  isAuthenticated(): boolean;
   
   /* get and set from response */
-  getDataFromResponse(response?: any): any;
-  getTokenFromResponse(response?: any, tokenProp?: any, tokenName?: any, tokenRoot?: any): any;
-  toUpdateTokenCallstack(): any;
-  resolveUpdateTokenCallstack(response?: any): any;
+  getDataFromResponse(response: {}): {};
+  
+  /**
+     * Extract the token from the server response
+     *
+     * @param {{}} response The response
+     * @param {string} tokenProp tokenProp
+     * @param {string} tokenName tokenName
+     * @param {string} tokenRoot tokenRoot
+     * @returns {string} The token
+     *
+     * @memberOf Authentication
+     */
+  getTokenFromResponse(response: {}, tokenProp: string, tokenName: string, tokenRoot: string): string;
+  toUpdateTokenCallstack(): Promise<any>;
+  resolveUpdateTokenCallstack(response: {}): any;
   
   /**
      * Authenticate with third-party
      *
-     * @param {String}    name of the provider
-     * @param {[{}]}      [userData]
+     * @param {string}    name        Name of the provider
+     * @param {[{}]}      [userData]  Additional data send to the authentication server
      *
-     * @return {Promise<response>}
+     * @return {Promise<any>} The authentication server response
      */
-  authenticate(name?: any, userData?: any): any;
-  redirect(redirectUrl?: any, defaultRedirectUrl?: any, query?: any): any;
+  authenticate(name: string, userData?: {}): Promise<any>;
+  
+  /**
+     * Send logout request to oauth provider
+     *
+     * @param {string} name The provider name
+     * @returns {Promise<any>} The server response
+     *
+     * @memberOf Authentication
+     */
+  logout(name: string): Promise<any>;
+  
+  /**
+     * Redirect (page reload if applicable for the browsers save password option)
+     *
+     * @param {string}   redirectUrl The redirect url. To not redirect use an empty string.
+     * @param {[string]} defaultRedirectUrl The defaultRedirectUrl. Used when redirectUrl is undefined
+     * @param {[string]} query The optional query string to add the the url
+     * @returns {undefined} undefined
+     *
+     * @memberOf Authentication
+     */
+  redirect(redirectUrl: string, defaultRedirectUrl?: string, query?: string): any;
 }
+
+/* eslint-disable max-lines */
 export declare class AuthService {
   
   /**
@@ -270,28 +394,28 @@ export declare class AuthService {
      *
      * @param  {Authentication}
      */
-  authentication: any;
+  authentication: Authentication;
   
   /**
-     * The Config instance that contains the current configuration setting
+     * The BaseConfig instance that contains the current configuration setting
      *
-     * @param  {Config}
+     * @param  {BaseConfig}
      */
-  config: any;
+  config: BaseConfig;
   
   /**
      * The current login status
      *
-     * @param  {Boolean}
+     * @param  {boolean}
      */
-  authenticated: any;
+  authenticated: boolean;
   
   /**
      * The currently set timeoutID
      *
-     * @param  {Number}
+     * @param  {number}
      */
-  timeoutID: any;
+  timeoutID: number;
   
   /**
      *  Create an AuthService instance
@@ -301,21 +425,21 @@ export declare class AuthService {
      * @param  {BindingSignaler} bindingSignaler The BindingSignaler instance to be used
      * @param  {EventAggregator} eventAggregator The EventAggregator instance to be used
      */
-  constructor(authentication?: any, config?: any, bindingSignaler?: any, eventAggregator?: any);
+  constructor(authentication: Authentication, config: BaseConfig, bindingSignaler: BindingSignaler, eventAggregator: EventAggregator);
   
   /**
      * The handler used for storage events. Detects and handles authentication changes in other tabs/windows
      *
-     * @param {StorageEvent}
+     * @param {StorageEvent} event StorageEvent
      */
   storageEventHandler: any;
   
   /**
-     * Getter: The configured client for all aurelia-authentication requests
+     * Getter: The configured Rest client for all aurelia-authentication requests
      *
-     * @return {HttpClient}
+     * @return {Rest}
      */
-  client: any;
+  client: Rest;
   
   /**
      * Getter: The authentication class instance
@@ -323,14 +447,14 @@ export declare class AuthService {
      * @return {boolean}
      * @deprecated
      */
-  auth: any;
+  auth: Authentication;
   
   /**
      * Sets the login timeout
      *
-     * @param  {Number} ttl  Timeout time in ms
+     * @param  {number} ttl  Timeout time in ms
      */
-  setTimeout(ttl?: any): any;
+  setTimeout(ttl: number): any;
   
   /**
      * Clears the login timeout
@@ -340,9 +464,9 @@ export declare class AuthService {
   /**
      * Stores and analyses the servers responseObject. Sets login status and timeout
      *
-     * @param {Object} response The servers response as GOJO
+     * @param {{}} response The servers response as object
      */
-  setResponseObject(response?: any): any;
+  setResponseObject(response: {}): any;
   
   /**
      * Update authenticated. Sets login status and timeout
@@ -352,146 +476,160 @@ export declare class AuthService {
   /**
      * Get current user profile from server
      *
-     * @param {[{}|number|string]}  [criteriaOrId object or a Number|String converted to {id: criteriaOrId}]
+     * @param {({}|number|string)} [criteriaOrId] (optional) An object or a number|string converted to {id: criteriaOrId}
+     * @returns {Promise<any>} The server response
      *
-     * @return {Promise<response>}
+     * @memberOf AuthService
      */
-  getMe(criteriaOrId?: any): any;
+  getMe(criteriaOrId?: {} | number | string): Promise<any>;
   
   /**
      * Send current user profile update to server
-  
-     * @param {any}                 Request body with data.
-     * @param {[{}|Number|String]}  [criteriaOrId object or a Number|String converted to {id: criteriaOrId}]
      *
-     * @return {Promise<response>}
+     * @param {{}}                body           Request body with data.
+     * @param {{}|number|string}  [criteriaOrId] (optional) An object or a number|string converted to {id: criteriaOrId}
+     *
+     * @return {Promise<any>} The server response
      */
-  updateMe(body?: any, criteriaOrId?: any): any;
+  updateMe(body: {}, criteriaOrId?: {} | number | string): Promise<any>;
   
   /**
      * Get accessToken from storage
      *
-     * @returns {String} Current accessToken
+     * @returns {string} Current accessToken
      */
-  getAccessToken(): any;
-  getCurrentToken(): any;
+  getAccessToken(): string;
+  getCurrentToken(): string;
   
   /**
      * Get refreshToken from storage
      *
-     * @returns {String} Current refreshToken
+     * @returns {string} Current refreshToken
      */
-  getRefreshToken(): any;
+  getRefreshToken(): string;
   
   /**
      * Get idToken from storage
      *
-     * @returns {String} Current idToken
+     * @returns {string} Current idToken
      */
-  getIdToken(): any;
+  getIdToken(): string;
   
   /**
     * Gets authentication status from storage
     *
-    * @returns {Boolean} For Non-JWT and unexpired JWT: true, else: false
+    * @param {[Function]} [callback] optional callback (authenticated: boolean) => void executed once the status is determined
+    *
+    * @returns {boolean} For Non-JWT and unexpired JWT: true, else: false
     */
-  isAuthenticated(): any;
+  isAuthenticated(callback?: ((authenticated: boolean) => void)): boolean;
   
   /**
      * Gets exp in milliseconds
      *
-     * @returns {Number} Exp for JWT tokens, NaN for all other tokens
+     * @returns {number} Exp for JWT tokens, NaN for all other tokens
      */
-  getExp(): any;
+  getExp(): number;
   
   /**
      * Gets ttl in seconds
      *
-     * @returns {Number} Ttl for JWT tokens, NaN for all other tokens
+     * @returns {number} Ttl for JWT tokens, NaN for all other tokens
      */
-  getTtl(): any;
+  getTtl(): number;
   
   /**
     * Gets exp from token payload and compares to current time
     *
-    * @returns {Boolean} Returns (ttl > 0)? for JWT, undefined other tokens
+    * @returns {boolean} Returns (ttl > 0)? for JWT, undefined other tokens
     */
-  isTokenExpired(): any;
+  isTokenExpired(): boolean;
   
   /**
-    * Get payload from tokens
+    * Get payload from access token
     *
-    * @returns {Object} Payload for JWT, else null
+    * @returns {{}} Payload for JWT, else null
     */
-  getTokenPayload(): any;
+  getTokenPayload(): {};
   
   /**
-     * Request new accesss token
+    * Get payload from id token
+    *
+    * @returns {{}} Payload for JWT, else null
+    */
+  getIdTokenPayload(): {};
+  
+  /**
+     * Request new access token
      *
-     * @returns {Promise<Response>} Requests new token. can be called multiple times
+     * @returns {Promise<any>} Requests new token. can be called multiple times
      */
-  updateToken(): any;
+  updateToken(): Promise<any>;
   
   /**
      * Signup locally. Login and redirect depending on config
      *
-     * @param {String|{}}   displayNameOrCredentials displayName | object with signup data.
-     * @param {[String]|{}} emailOrOptions           [email | options for post request]
-     * @param {[String]}    passwordOrRedirectUri    [password | optional redirectUri overwrite]
+     * @param {string|{}}   displayNameOrCredentials displayName | object with signup data.
+     * @param {[string]|{}} emailOrOptions           [email | options for post request]
+     * @param {[string]}    passwordOrRedirectUri    [password | optional redirectUri overwrite]
      * @param {[{}]}        options                  [options]
-     * @param {[String]}    redirectUri              [optional redirectUri overwrite]
+     * @param {[string]}    [redirectUri]            [optional redirectUri overwrite, ''= no redirection]
      *
-     * @return {Promise<Object>|Promise<Error>}     Server response as Object
+     * @return {Promise<any>} Server response as Object
      */
-  signup(displayNameOrCredentials?: any, emailOrOptions?: any, passwordOrRedirectUri?: any, options?: any, redirectUri?: any): any;
+  signup(displayNameOrCredentials: string | {}, emailOrOptions?: string | {}, passwordOrRedirectUri?: string, options?: {}, redirectUri?: string): Promise<any>;
   
   /**
-     * login locally. Redirect depending on config
+     * Login locally. Redirect depending on config
      *
-     * @param {[String]|{}} emailOrCredentials      email | object with signup data.
-     * @param {[String]}    [passwordOrOptions]     [password | options for post request]
+     * @param {[string]|{}} emailOrCredentials      email | object with signup data.
+     * @param {[string]}    [passwordOrOptions]     [password | options for post request]
      * @param {[{}]}        [optionsOrRedirectUri]  [options | redirectUri overwrite]]
-     * @param {[String]}    [redirectUri]           [optional redirectUri overwrite]
+     * @param {[string]}    [redirectUri]           [optional redirectUri overwrite, ''= no redirection]
      *
      * @return {Promise<Object>|Promise<Error>}    Server response as Object
      */
-  login(emailOrCredentials?: any, passwordOrOptions?: any, optionsOrRedirectUri?: any, redirectUri?: any): any;
+  login(emailOrCredentials?: string | {}, passwordOrOptions?: string | {}, optionsOrRedirectUri?: {}, redirectUri?: string): Promise<any>;
   
   /**
-     * logout locally and redirect to redirectUri (if set) or redirectUri of config. Sends logout request first, if set in config
+     * Logout locally and redirect to redirectUri (if set) or redirectUri of config.
+     * Sends logout request first, if set in config
      *
-     * @param {[String]}    [redirectUri]                     [optional redirectUri overwrite]
+     * @param {[string]}    [redirectUri]    [optional redirectUri overwrite, ''= no redirection]
+     * @param {[string]}    [query]          [optional query string for the uri]
+     * @param {[string]}    [name]           [optional name Name of the provider]
      *
-     * @return {Promise<>|Promise<Object>|Promise<Error>}     Server response as Object
+     * @return {Promise<any>}     Server response as Object
      */
-  logout(redirectUri?: any, query?: any): any;
+  logout(redirectUri?: string, query?: string, name?: string): Promise<any>;
   
   /**
      * Authenticate with third-party and redirect to redirectUri (if set) or redirectUri of config
      *
-     * @param {String}    name          Name of the provider
-     * @param {[String]}  [redirectUri] [optional redirectUri overwrite]
+     * @param {string}    name          Name of the provider
+     * @param {[string]}  [redirectUri] [optional redirectUri overwrite]
      * @param {[{}]}      [userData]    [optional userData for the local authentication server]
      *
-     * @return {Promise<Object>|Promise<Error>}     Server response as Object
+     * @return {Promise<any>} Server response as Object
      */
-  authenticate(name?: any, redirectUri?: any, userData?: any): any;
+  authenticate(name: string, redirectUri?: string, userData?: {}): Promise<any>;
   
   /**
      * Unlink third-party
      *
-     * @param {String}      name                  Name of the provider
+     * @param {string}    name          Name of the provider
+     * @param {[string]}  [redirectUri] [optional redirectUri overwrite]
      *
-     * @return {Promise<Object>|Promise<Error>}  Server response as Object
+     * @return {Promise<any>}  Server response as Object
      */
-  unlink(name?: any, redirectUri?: any): any;
+  unlink(name: string, redirectUri?: string): Promise<any>;
 }
 export declare class AuthenticateStep {
-  constructor(authService?: any);
+  constructor(authService: AuthService);
   run(routingContext?: any, next?: any): any;
 }
 export declare class AuthorizeStep {
-  constructor(authService?: any);
+  constructor(authService: AuthService);
   run(routingContext?: any, next?: any): any;
 }
 export declare class FetchConfig {
@@ -499,28 +637,28 @@ export declare class FetchConfig {
   /**
      * Construct the FetchConfig
      *
-     * @param {HttpClient} httpClient
-     * @param {Config} clientConfig
-     * @param {Authentication} authService
-     * @param {BaseConfig} config
+     * @param {HttpClient} httpClient httpClient
+     * @param {Config} clientConfig clientConfig
+     * @param {Authentication} authService authService
+     * @param {BaseConfig} config baseConfig
      */
-  constructor(httpClient?: any, clientConfig?: any, authService?: any, config?: any);
+  constructor(httpClient: HttpClient, clientConfig: Config, authService: Authentication, config: BaseConfig);
   
   /**
      * Interceptor for HttpClient
      *
-     * @return {{request: Function, response: Function}}
+     * @return {{request: Function, response: Function}} The interceptor
      */
-  interceptor: any;
+  interceptor: { request: Function, response: Function };
   
   /**
      * Configure client(s) with authorization interceptor
      *
      * @param {HttpClient|Rest|string[]} client HttpClient, rest client or api endpoint name, or an array thereof
      *
-     * @return {HttpClient[]}
+     * @return {HttpClient[]} The configured client(s)
      */
-  configure(client?: any): any;
+  configure(client: HttpClient | Rest | Array<string>): HttpClient | Array<HttpClient>;
 }
 
 // added for bundling
@@ -530,37 +668,39 @@ export declare class FetchConfig {
 /**
  * Configure the plugin.
  *
- * @param {{globalResources: Function, container: {Container}}} aurelia
- * @param {{}|Function}                                         config
+ * @export
+ * @param {FrameworkConfiguration} frameworkConfig The FrameworkConfiguration instance
+ * @param {{}|Function}            config          The Config instance
+ *
  */
-export declare function configure(aurelia?: any, config?: any): any;
+export declare function configure(frameworkConfig: { container: Container, globalResources: (() => any) }, config: {} | Function): any;
+export declare class AuthFilterValueConverter {
+  
+  /**
+     * route toView predictator on route.config.auth === isAuthenticated
+     * @param  {RouteConfig}  routes            the routes array to convert
+     * @param  {boolean}      isAuthenticated   authentication status
+     * @return {boolean}      show/hide element
+     */
+  toView(routes: RouteConfig, isAuthenticated: boolean): boolean;
+}
 export declare class AuthenticatedFilterValueConverter {
-  constructor(authService?: any);
+  constructor(authService: AuthService);
   
   /**
      * route toView predictator on route.config.auth === (parameter || authService.isAuthenticated())
      * @param  {RouteConfig}  routes            the routes array to convert
-     * @param  {[Boolean]}    [isAuthenticated] optional isAuthenticated value. default: this.authService.authenticated
-     * @return {Boolean}      show/hide element
+     * @param  {[boolean]}    [isAuthenticated] optional isAuthenticated value. default: this.authService.authenticated
+     * @return {boolean}      show/hide element
      */
-  toView(routes?: any, isAuthenticated?: any): any;
+  toView(routes: RouteConfig, isAuthenticated?: boolean): boolean;
 }
 export declare class AuthenticatedValueConverter {
   constructor(authService?: any);
   
   /**
      * element toView predictator on authService.isAuthenticated()
-     * @return {Boolean}  show/hide element
+     * @return {boolean}  show/hide element
      */
   toView(): any;
-}
-export declare class AuthFilterValueConverter {
-  
-  /**
-     * route toView predictator on route.config.auth === isAuthenticated
-     * @param  {RouteConfig}  routes            the routes array to convert
-     * @param  {Boolean}      isAuthenticated   authentication status
-     * @return {Boolean}      show/hide element
-     */
-  toView(routes?: any, isAuthenticated?: any): any;
 }

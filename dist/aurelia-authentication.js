@@ -1,18 +1,19 @@
-import {AuthFilterValueConverter} from "./authFilterValueConverter"
-import {AuthenticatedValueConverter} from "./authenticatedValueConverter"
-import {AuthenticatedFilterValueConverter} from "./authenticatedFilterValueConverter"
 import extend from 'extend';
-import * as LogManager from 'aurelia-logging';
 import jwtDecode from 'jwt-decode';
 import {PLATFORM,DOM} from 'aurelia-pal';
 import {parseQueryString,join,buildQueryString} from 'aurelia-path';
-import {inject} from 'aurelia-dependency-injection';
+import {getLogger} from 'aurelia-logging';
+import {inject,Container} from 'aurelia-dependency-injection';
 import {deprecated} from 'aurelia-metadata';
 import {EventAggregator} from 'aurelia-event-aggregator';
 import {BindingSignaler} from 'aurelia-templating-resources';
+import {Rest,Config} from 'aurelia-api';
 import {Redirect} from 'aurelia-router';
 import {HttpClient} from 'aurelia-fetch-client';
-import {Config,Rest} from 'aurelia-api';
+
+import {AuthFilterValueConverter} from "./authFilterValueConverter"
+import {AuthenticatedValueConverter} from "./authenticatedValueConverter"
+import {AuthenticatedFilterValueConverter} from "./authenticatedFilterValueConverter"
 
 export class Popup {
   constructor() {
@@ -21,7 +22,7 @@ export class Popup {
     this.url         = '';
   }
 
-  open(url, windowName, options) {
+  open(url: string, windowName: string, options?: {}): Popup {
     this.url = url;
     const optionsString = buildPopupWindowOptions(options || {});
 
@@ -34,7 +35,7 @@ export class Popup {
     return this;
   }
 
-  eventListener(redirectUri) {
+  eventListener(redirectUri: string): Promise<any> {
     return new Promise((resolve, reject) => {
       this.popupWindow.addEventListener('loadstart', event => {
         if (event.url.indexOf(redirectUri) !== 0) {
@@ -42,6 +43,7 @@ export class Popup {
         }
 
         const parser  = DOM.createElement('a');
+
         parser.href = event.url;
 
         if (parser.search || parser.hash) {
@@ -67,7 +69,7 @@ export class Popup {
     });
   }
 
-  pollPopup() {
+  pollPopup(): Promise<any> {
     return new Promise((resolve, reject) => {
       this.polling = PLATFORM.global.setInterval(() => {
         let errorData;
@@ -94,13 +96,13 @@ export class Popup {
           PLATFORM.global.clearInterval(this.polling);
           reject({
             error: errorData,
-            data: 'Provider Popup Blocked'
+            data : 'Provider Popup Blocked'
           });
         } else if (this.popupWindow.closed) {
           PLATFORM.global.clearInterval(this.polling);
           reject({
             error: errorData,
-            data: 'Problem poll popup'
+            data : 'Problem poll popup'
           });
         }
       }, 35);
@@ -108,70 +110,79 @@ export class Popup {
   }
 }
 
-const buildPopupWindowOptions = options => {
+const buildPopupWindowOptions = (options: {}): string => {
   const width  = options.width || 500;
   const height = options.height || 500;
 
   const extended = extend({
-    width: width,
+    width : width,
     height: height,
-    left: PLATFORM.global.screenX + ((PLATFORM.global.outerWidth - width) / 2),
-    top: PLATFORM.global.screenY + ((PLATFORM.global.outerHeight - height) / 2.5)
+    left  : PLATFORM.global.screenX + ((PLATFORM.global.outerWidth - width) / 2),
+    top   : PLATFORM.global.screenY + ((PLATFORM.global.outerHeight - height) / 2.5)
   }, options);
 
   let parts = [];
+
   Object.keys(extended).map(key => parts.push(key + '=' + extended[key]));
 
   return parts.join(',');
 };
 
-const parseUrl = url => {
+const parseUrl = (url: string): {} => {
   let hash = (url.hash.charAt(0) === '#') ? url.hash.substr(1) : url.hash;
 
   return extend(true, {}, parseQueryString(url.search), parseQueryString(hash));
 };
 
+export const logger = getLogger('aurelia-authentication');
+
+/* eslint-disable max-lines */
 export class BaseConfig {
   /**
    * Prepends baseUrl to a given url
-   * @param  {String} url The relative url to append
-   * @return {String}     joined baseUrl and url
+   * @param  {string} url The relative url to append
+   * @return {string}     joined baseUrl and url
    */
-  joinBase(url) {
+  joinBase(url: string): string {
     return join(this.baseUrl, url);
   }
 
   /**
-   * Merge current settings with incomming settings
-   * @param  {Object} incomming Settings object to be merged into the current configuration
-   * @return {Config}           this
+   * Merge current settings with incoming settings
+   * @param  {Object} incoming Settings object to be merged into the current configuration
    */
-  configure(incomming) {
-    for (let key in incomming) {
-      const value = incomming[key];
-      if (value !== undefined) {
-        if (Array.isArray(value) || typeof value !== 'object' || value === null) {
-          this[key] = value;
-        } else {
-          extend(true, this[key], value);
+  configure(incoming: {}): Config {
+    for (let key in incoming) {
+      if (incoming.hasOwnProperty(key)) {
+        const value = incoming[key];
+
+        if (value !== undefined) {
+          if (Array.isArray(value) || typeof value !== 'object' || value === null) {
+            this[key] = value;
+          } else {
+            extend(true, this[key], value);
+          }
         }
       }
     }
   }
 
+  getOptionsForTokenRequests(options?:{} = {}): {} {
+      return extend(true, {}, {headers: this.defaultHeadersForTokenRequests}, options);
+  }
+
   /* ----------- default  config ----------- */
 
   // Used internally. The used Rest instance; set during configuration (see index.js)
-  client = null;
+  client: Rest = null;
 
   // If using aurelia-api:
   // =====================
 
   // This is the name of the endpoint used for any requests made in relation to authentication (login, logout, etc.). An empty string selects the default endpoint of aurelia-api.
-  endpoint = null;
+  endpoint: string = null;
   // When authenticated, these endpoints will have the token added to the header of any requests (for authorization). Accepts an array of endpoint names. An empty string selects the default endpoint of aurelia-api.
-  configureEndpoints = null;
-
+  configureEndpoints: Array<string> = null;
 
   // SPA related options
   // ===================
@@ -216,7 +227,6 @@ export class BaseConfig {
   // The API endpoint to which refreshToken requests are sent. null = loginUrl
   refreshTokenUrl = null;
 
-
   // Token Options
   // =============
 
@@ -224,9 +234,10 @@ export class BaseConfig {
   authHeader = 'Authorization';
   // The token name used in the header of API requests that require authentication
   authTokenType = 'Bearer';
+  // Logout when the token is invalidated by the server
+  logoutOnInvalidToken = false;
   // The the property from which to get the access token after a successful login or signup. Can also be dotted eg "accessTokenProp.accessTokenName"
   accessTokenProp = 'access_token';
-
 
   // If the property defined by `accessTokenProp` is an object:
   // ------------------------------------------------------------
@@ -235,7 +246,6 @@ export class BaseConfig {
   accessTokenName = 'token';
   // This allows the token to be a further object deeper `{ "accessTokenProp": { "accessTokenRoot" : { "accessTokenName" : '...' } } }`
   accessTokenRoot = false;
-
 
   // Refresh Token Options
   // =====================
@@ -246,8 +256,15 @@ export class BaseConfig {
   autoUpdateToken = true;
   // Oauth Client Id
   clientId = false;
+  // Oauth Client secret
+  clientSecret = null;
   // The the property from which to get the refresh token after a successful token refresh. Can also be dotted eg "refreshTokenProp.refreshTokenProp"
   refreshTokenProp = 'refresh_token';
+  // The property name used to send the existing token when refreshing `{ "refreshTokenSubmitProp": '...' }`
+  refreshTokenSubmitProp = 'refresh_token';
+
+  // Option to maintain unchanged response properties This allows to work with a single refresh_token that was received once and the expiration only is extend
+  keepOldResponseProperties = false;
 
   // If the property defined by `refreshTokenProp` is an object:
   // -----------------------------------------------------------
@@ -278,146 +295,163 @@ export class BaseConfig {
   storage = 'localStorage';
   // The key used for storing the authentication response locally
   storageKey = 'aurelia_authentication';
-  // optional function to extract the expiration date. takes the server response as parameter
-  // eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() + serverResponse.expires_in * 1000;
+  // full page reload if authorization changed in another tab (recommended to set it to 'true')
+  storageChangedReload = false;
+  // optional function to extract the expiration date. Takes the server response as parameter and returns NumericDate = number of seconds! since 1 January 1970 00:00:00 UTC (Unix Epoch)
+  // eg (expires_in in sec): getExpirationDateFromResponse = serverResponse => new Date().getTime() / 1000 + serverResponse.expires_in;
   getExpirationDateFromResponse = null;
-  // optional function to extract the access token from the response. takes the server response as parameter
+  // optional function to extract the access token from the response. Takes the server response as parameter and returns a token
   // eg: getAccessTokenFromResponse = serverResponse => serverResponse.data[0].access_token;
   getAccessTokenFromResponse = null;
-  // optional function to extract the refresh token from the response. takes the server response as parameter
+  // optional function to extract the refresh token from the response. Takes the server response as parameter and returns a token
   // eg: getRefreshTokenFromResponse = serverResponse => serverResponse.data[0].refresh_token;
   getRefreshTokenFromResponse = null;
 
   // List of value-converters to make global
   globalValueConverters = ['authFilterValueConverter'];
 
-//OAuth provider specific related configuration
+  // Default headers for login and token-update endpoint
+  defaultHeadersForTokenRequests = {
+    'Content-Type': 'application/json'
+  }
+
+  //OAuth provider specific related configuration
   // ============================================
   providers = {
     facebook: {
-      name: 'facebook',
-      url: '/auth/facebook',
+      name                 : 'facebook',
+      url                  : '/auth/facebook',
       authorizationEndpoint: 'https://www.facebook.com/v2.5/dialog/oauth',
-      redirectUri: PLATFORM.location.origin + '/',
-      requiredUrlParams: ['display', 'scope'],
-      scope: ['email'],
-      scopeDelimiter: ',',
-      display: 'popup',
-      oauthType: '2.0',
-      popupOptions: { width: 580, height: 400 }
+      redirectUri          : PLATFORM.location.origin + '/',
+      requiredUrlParams    : ['display', 'scope'],
+      scope                : ['email'],
+      scopeDelimiter       : ',',
+      display              : 'popup',
+      oauthType            : '2.0',
+      popupOptions         : {width: 580, height: 400}
     },
     google: {
-      name: 'google',
-      url: '/auth/google',
+      name                 : 'google',
+      url                  : '/auth/google',
       authorizationEndpoint: 'https://accounts.google.com/o/oauth2/auth',
-      redirectUri: PLATFORM.location.origin,
-      requiredUrlParams: ['scope'],
-      optionalUrlParams: ['display', 'state'],
-      scope: ['profile', 'email'],
-      scopePrefix: 'openid',
-      scopeDelimiter: ' ',
-      display: 'popup',
-      oauthType: '2.0',
-      popupOptions: { width: 452, height: 633 },
-      state: randomState
+      redirectUri          : PLATFORM.location.origin,
+      requiredUrlParams    : ['scope'],
+      optionalUrlParams    : ['display', 'state'],
+      scope                : ['profile', 'email'],
+      scopePrefix          : 'openid',
+      scopeDelimiter       : ' ',
+      display              : 'popup',
+      oauthType            : '2.0',
+      popupOptions         : {width: 452, height: 633},
+      state                : randomState
     },
     github: {
-      name: 'github',
-      url: '/auth/github',
+      name                 : 'github',
+      url                  : '/auth/github',
       authorizationEndpoint: 'https://github.com/login/oauth/authorize',
-      redirectUri: PLATFORM.location.origin,
-      optionalUrlParams: ['scope'],
-      scope: ['user:email'],
-      scopeDelimiter: ' ',
-      oauthType: '2.0',
-      popupOptions: { width: 1020, height: 618 }
+      redirectUri          : PLATFORM.location.origin,
+      optionalUrlParams    : ['scope'],
+      scope                : ['user:email'],
+      scopeDelimiter       : ' ',
+      oauthType            : '2.0',
+      popupOptions         : {width: 1020, height: 618}
     },
     instagram: {
-      name: 'instagram',
-      url: '/auth/instagram',
+      name                 : 'instagram',
+      url                  : '/auth/instagram',
       authorizationEndpoint: 'https://api.instagram.com/oauth/authorize',
-      redirectUri: PLATFORM.location.origin,
-      requiredUrlParams: ['scope'],
-      scope: ['basic'],
-      scopeDelimiter: '+',
-      oauthType: '2.0'
+      redirectUri          : PLATFORM.location.origin,
+      requiredUrlParams    : ['scope'],
+      scope                : ['basic'],
+      scopeDelimiter       : '+',
+      oauthType            : '2.0'
     },
     linkedin: {
-      name: 'linkedin',
-      url: '/auth/linkedin',
+      name                 : 'linkedin',
+      url                  : '/auth/linkedin',
       authorizationEndpoint: 'https://www.linkedin.com/uas/oauth2/authorization',
-      redirectUri: PLATFORM.location.origin,
-      requiredUrlParams: ['state'],
-      scope: ['r_emailaddress'],
-      scopeDelimiter: ' ',
-      state: 'STATE',
-      oauthType: '2.0',
-      popupOptions: { width: 527, height: 582 }
+      redirectUri          : PLATFORM.location.origin,
+      requiredUrlParams    : ['state'],
+      scope                : ['r_emailaddress'],
+      scopeDelimiter       : ' ',
+      state                : 'STATE',
+      oauthType            : '2.0',
+      popupOptions         : {width: 527, height: 582}
     },
     twitter: {
-      name: 'twitter',
-      url: '/auth/twitter',
+      name                 : 'twitter',
+      url                  : '/auth/twitter',
       authorizationEndpoint: 'https://api.twitter.com/oauth/authenticate',
-      redirectUri: PLATFORM.location.origin,
-      oauthType: '1.0',
-      popupOptions: { width: 495, height: 645 }
+      redirectUri          : PLATFORM.location.origin,
+      oauthType            : '1.0',
+      popupOptions         : {width: 495, height: 645}
     },
     twitch: {
-      name: 'twitch',
-      url: '/auth/twitch',
+      name                 : 'twitch',
+      url                  : '/auth/twitch',
       authorizationEndpoint: 'https://api.twitch.tv/kraken/oauth2/authorize',
-      redirectUri: PLATFORM.location.origin,
-      requiredUrlParams: ['scope'],
-      scope: ['user_read'],
-      scopeDelimiter: ' ',
-      display: 'popup',
-      oauthType: '2.0',
-      popupOptions: { width: 500, height: 560 }
+      redirectUri          : PLATFORM.location.origin,
+      requiredUrlParams    : ['scope'],
+      scope                : ['user_read'],
+      scopeDelimiter       : ' ',
+      display              : 'popup',
+      oauthType            : '2.0',
+      popupOptions         : {width: 500, height: 560}
     },
     live: {
-      name: 'live',
-      url: '/auth/live',
+      name                 : 'live',
+      url                  : '/auth/live',
       authorizationEndpoint: 'https://login.live.com/oauth20_authorize.srf',
-      redirectUri: PLATFORM.location.origin,
-      requiredUrlParams: ['display', 'scope'],
-      scope: ['wl.emails'],
-      scopeDelimiter: ' ',
-      display: 'popup',
-      oauthType: '2.0',
-      popupOptions: { width: 500, height: 560 }
+      redirectUri          : PLATFORM.location.origin,
+      requiredUrlParams    : ['display', 'scope'],
+      scope                : ['wl.emails'],
+      scopeDelimiter       : ' ',
+      display              : 'popup',
+      oauthType            : '2.0',
+      popupOptions         : {width: 500, height: 560}
     },
     yahoo: {
-      name: 'yahoo',
-      url: '/auth/yahoo',
+      name                 : 'yahoo',
+      url                  : '/auth/yahoo',
       authorizationEndpoint: 'https://api.login.yahoo.com/oauth2/request_auth',
-      redirectUri: PLATFORM.location.origin,
-      scope: [],
-      scopeDelimiter: ',',
-      oauthType: '2.0',
-      popupOptions: { width: 559, height: 519 }
+      redirectUri          : PLATFORM.location.origin,
+      scope                : [],
+      scopeDelimiter       : ',',
+      oauthType            : '2.0',
+      popupOptions         : {width: 559, height: 519}
     },
     bitbucket: {
-      name: 'bitbucket',
-      url: '/auth/bitbucket',
+      name                 : 'bitbucket',
+      url                  : '/auth/bitbucket',
       authorizationEndpoint: 'https://bitbucket.org/site/oauth2/authorize',
-      redirectUri: PLATFORM.location.origin + '/',
-      requiredUrlParams: ['scope'],
-      scope: ['email'],
-      scopeDelimiter: ' ',
-      oauthType: '2.0',
-      popupOptions: { width: 1028, height: 529 }
+      redirectUri          : PLATFORM.location.origin + '/',
+      requiredUrlParams    : ['scope'],
+      scope                : ['email'],
+      scopeDelimiter       : ' ',
+      oauthType            : '2.0',
+      popupOptions         : {width: 1028, height: 529}
+    },
+    azure_ad: {
+      name                 : 'azure_ad',
+      url                  : '/auth/azure_ad',
+      authorizationEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      redirectUri          : window.location.origin,
+      logoutEndpoint       : 'https://login.microsoftonline.com/common/oauth2/v2.0/logout',
+      postLogoutRedirectUri: window.location.origin,
+      requiredUrlParams    : ['scope'],
+      scope                : ['user.read'],
+      scopeDelimiter       : ' ',
+      oauthType            : '2.0'
     },
     auth0: {
-      name: 'auth0',
-      oauthType: 'auth0-lock',
-      clientId: 'your_client_id',
+      name        : 'auth0',
+      oauthType   : 'auth0-lock',
+      clientId    : 'your_client_id',
       clientDomain: 'your_domain_url',
-      display: 'popup',
-      lockOptions: {
-        popup: true
-      },
+      display     : 'popup',
+      lockOptions : {},
       responseType: 'token',
-      state: randomState
+      state       : randomState
     }
   };
 
@@ -442,15 +476,21 @@ export class BaseConfig {
    * @deprecated
    */
   _tokenPrefix = 'aurelia';
+ /**
+   * @deprecated
+   */
+  _logoutOnInvalidtoken = false;
 
-  /* deprecated methods and parameteres */
+  /* deprecated methods and parameters */
   /**
+   * @param {string} authToken
    * @deprecated
    */
   set authToken(authToken) {
-    LogManager.getLogger('authentication').warn('BaseConfig.authToken is deprecated. Use BaseConfig.authTokenType instead.');
+    logger.warn('BaseConfig.authToken is deprecated. Use BaseConfig.authTokenType instead.');
     this._authTokenType = authToken;
     this.authTokenType = authToken;
+
     return authToken;
   }
   get authToken() {
@@ -458,12 +498,14 @@ export class BaseConfig {
   }
 
   /**
+   * @param {string} responseTokenProp
    * @deprecated
    */
   set responseTokenProp(responseTokenProp) {
-    LogManager.getLogger('authentication').warn('BaseConfig.responseTokenProp is deprecated. Use BaseConfig.accessTokenProp instead.');
+    logger.warn('BaseConfig.responseTokenProp is deprecated. Use BaseConfig.accessTokenProp instead.');
     this._responseTokenProp = responseTokenProp;
     this.accessTokenProp = responseTokenProp;
+
     return responseTokenProp;
   }
   get responseTokenProp() {
@@ -471,12 +513,14 @@ export class BaseConfig {
   }
 
   /**
+   * @param {string} tokenRoot
    * @deprecated
    */
   set tokenRoot(tokenRoot) {
-    LogManager.getLogger('authentication').warn('BaseConfig.tokenRoot is deprecated. Use BaseConfig.accessTokenRoot instead.');
+    logger.warn('BaseConfig.tokenRoot is deprecated. Use BaseConfig.accessTokenRoot instead.');
     this._tokenRoot = tokenRoot;
     this.accessTokenRoot = tokenRoot;
+
     return tokenRoot;
   }
   get tokenRoot() {
@@ -484,12 +528,14 @@ export class BaseConfig {
   }
 
   /**
+   * @param {string} tokenName
    * @deprecated
    */
   set tokenName(tokenName) {
-    LogManager.getLogger('authentication').warn('BaseConfig.tokenName is deprecated. Use BaseConfig.accessTokenName instead.');
+    logger.warn('BaseConfig.tokenName is deprecated. Use BaseConfig.accessTokenName instead.');
     this._tokenName = tokenName;
     this.accessTokenName = tokenName;
+
     return tokenName;
   }
   get tokenName() {
@@ -497,11 +543,13 @@ export class BaseConfig {
   }
 
   /**
+   * @param {string} tokenPrefix
    * @deprecated
    */
   set tokenPrefix(tokenPrefix) {
-    LogManager.getLogger('authentication').warn('BaseConfig.tokenPrefix is obsolete. Use BaseConfig.storageKey instead.');
+    logger.warn('BaseConfig.tokenPrefix is obsolete. Use BaseConfig.storageKey instead.');
     this._tokenPrefix = tokenPrefix;
+
     return tokenPrefix;
   }
   get tokenPrefix() {
@@ -512,7 +560,8 @@ export class BaseConfig {
    * @deprecated
    */
   get current() {
-    LogManager.getLogger('authentication').warn('Getter BaseConfig.current is deprecated. Use BaseConfig directly instead.');
+    logger.warn('Getter BaseConfig.current is deprecated. Use BaseConfig directly instead.');
+
     return this;
   }
   set current(_) {
@@ -523,61 +572,83 @@ export class BaseConfig {
    * @deprecated
    */
   get _current() {
-    LogManager.getLogger('authentication').warn('Getter BaseConfig._current is deprecated. Use BaseConfig directly instead.');
+    logger.warn('Getter BaseConfig._current is deprecated. Use BaseConfig directly instead.');
+
     return this;
   }
   set _current(_) {
     throw new Error('Setter BaseConfig._current has been removed. Use BaseConfig directly instead.');
   }
+
+  /**
+   * @param {string} logoutOnInvalidtoken
+   * @deprecated
+   */
+  set logoutOnInvalidtoken(logoutOnInvalidtoken) {
+    logger.warn('BaseConfig.logoutOnInvalidtoken is obsolete. Use BaseConfig.logoutOnInvalidToken instead.');
+    this._logoutOnInvalidtoken = logoutOnInvalidtoken;
+    this.logoutOnInvalidToken = logoutOnInvalidtoken;
+
+    return logoutOnInvalidtoken;
+  }
+  get logoutOnInvalidtoken() {
+    return this._logoutOnInvalidtoken;
+  }
 }
 
+/**
+ * RandomState
+ *
+ * @returns {number}
+ */
 function randomState() {
-  let rand = Math.random().toString(36).substr(2);
+  let rand = Math.random()
+    .toString(36)
+    .substr(2);
+
   return encodeURIComponent(rand);
 }
 
 @inject(BaseConfig)
 export class Storage {
-  constructor(config) {
+  constructor(config: BaseConfig) {
     this.config = config;
   }
 
-  get(key) {
+  get(key: string): string {
     return PLATFORM.global[this.config.storage].getItem(key);
   }
 
-  set(key, value) {
+  set(key: string, value: string) {
     PLATFORM.global[this.config.storage].setItem(key, value);
   }
 
-  remove(key) {
+  remove(key: string) {
     PLATFORM.global[this.config.storage].removeItem(key);
   }
 }
 
 @inject(Storage, BaseConfig)
 export class AuthLock {
-  constructor(storage, config) {
-    this.storage      = storage;
-    this.config       = config;
-    this.defaults     = {
-      name: null,
-      state: null,
-      scope: null,
-      scopeDelimiter: null,
-      redirectUri: null,
-      clientId: null,
-      clientDomain: null,
-      display: 'popup',
-      lockOptions: {
-        popup: true
-      },
-      popupOptions: null,
-      responseType: 'token'
+  constructor(storage: Storage, config: BaseConfig) {
+    this.storage  = storage;
+    this.config   = config;
+    this.defaults = {
+      name          : null,
+      state         : null,
+      scope         : null,
+      scopeDelimiter: ' ',
+      redirectUri   : null,
+      clientId      : null,
+      clientDomain  : null,
+      display       : 'popup',
+      lockOptions   : {},
+      popupOptions  : null,
+      responseType  : 'token'
     };
   }
 
-  open(options, userData) {
+  open(options: {}, userData?: {}): Promise<any> {
     // check pre-conditions
     if (typeof PLATFORM.global.Auth0Lock !== 'function') {
       throw new Error('Auth0Lock was not found in global scope. Please load it before using this provider.');
@@ -591,34 +662,62 @@ export class AuthLock {
       this.storage.set(stateName, provider.state);
     }
 
-    this.lock = this.lock || new PLATFORM.global.Auth0Lock(provider.clientId, provider.clientDomain);
+    // transform provider options into auth0-lock options
+    let opts = {
+      auth: {
+        params: {}
+      }
+    };
+
+    if (Array.isArray(provider.scope) && provider.scope.length) {
+      opts.auth.params.scope = provider.scope.join(provider.scopeDelimiter);
+    }
+    if (provider.state) {
+      opts.auth.params.state = this.storage.get(provider.name + '_state');
+    }
+    if (provider.display === 'popup') {
+      opts.auth.redirect = false;
+    } else if (typeof provider.redirectUri === 'string') {
+      opts.auth.redirect = true;
+      opts.auth.redirectUrl = provider.redirectUri;
+    }
+    if (typeof provider.popupOptions === 'object') {
+      opts.popupOptions = provider.popupOptions;
+    }
+    if (typeof provider.responseType === 'string') {
+      opts.auth.responseType = provider.responseType;
+    }
+    let lockOptions = extend(true, {}, provider.lockOptions, opts);
+
+    this.lock = this.lock || new PLATFORM.global.Auth0Lock(provider.clientId, provider.clientDomain, lockOptions);
 
     const openPopup = new Promise((resolve, reject) => {
-      let opts = provider.lockOptions;
-      opts.popupOptions = provider.popupOptions;
-      opts.responseType = provider.responseType;
-      opts.callbackURL = provider.redirectUri;
-      opts.authParams = opts.authParams || {};
-      if (provider.scope) opts.authParams.scope = provider.scope;
-      if (provider.state) opts.authParams.state = this.storage.get(provider.name + '_state');
-
-      this.lock.show(provider.lockOptions, (err, profile, tokenOrCode) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({
-            //NOTE: this is an id token (JWT) and it shouldn't be named access_token
-            access_token: tokenOrCode
-          });
+      this.lock.on('authenticated', authResponse => {
+        if (!lockOptions.auth.redirect) {
+          // hides the lock popup, as it doesn't do so automatically
+          this.lock.hide();
         }
+        resolve({
+          access_token: authResponse.accessToken,
+          id_token    : authResponse.idToken
+        });
       });
+      this.lock.on('unrecoverable_error', err => {
+        if (!lockOptions.auth.redirect) {
+          // hides the lock popup, as it doesn't do so automatically
+          this.lock.hide();
+        }
+        reject(err);
+      });
+      this.lock.show();
     });
 
     return openPopup
       .then(lockResponse => {
-        if (provider.responseType === 'token' ||
-            provider.responseType === 'id_token%20token' ||
-            provider.responseType === 'token%20id_token'
+        if (provider.responseType === 'token'
+          || provider.responseType === 'id_token%20token'
+          || provider.responseType === 'token%20id_token'
+          || provider.responseType === 'token id_token'
         ) {
           return lockResponse;
         }
@@ -631,20 +730,20 @@ export class AuthLock {
 
 @inject(Storage, Popup, BaseConfig)
 export class OAuth1 {
-  constructor(storage, popup, config) {
+  constructor(storage: Storage, popup: Popup, config: BaseConfig) {
     this.storage  = storage;
     this.config   = config;
     this.popup    = popup;
     this.defaults = {
-      url: null,
-      name: null,
-      popupOptions: null,
-      redirectUri: null,
+      url                  : null,
+      name                 : null,
+      popupOptions         : null,
+      redirectUri          : null,
       authorizationEndpoint: null
     };
   }
 
-  open(options, userData) {
+  open(options: {}, userData: {}): Promise<any> {
     const provider  = extend(true, {}, this.defaults, options);
     const serverUrl = this.config.joinBase(provider.url);
 
@@ -670,7 +769,7 @@ export class OAuth1 {
       });
   }
 
-  exchangeForToken(oauthData, userData, provider) {
+  exchangeForToken(oauthData: {}, userData: {}, provider: string): Promise<any> {
     const data        = extend(true, {}, userData, oauthData);
     const serverUrl   = this.config.joinBase(provider.url);
     const credentials = this.config.withCredentials ? 'include' : 'same-origin';
@@ -679,30 +778,54 @@ export class OAuth1 {
   }
 }
 
+/**
+ * OAuth2 service class
+ *
+ * @export
+ * @class OAuth2
+ */
 @inject(Storage, Popup, BaseConfig)
 export class OAuth2 {
-  constructor(storage, popup, config) {
+  /**
+   * Creates an instance of OAuth2.
+   *
+   * @param {Storage} storage The Storage instance
+   * @param {Popup}   popup   The Popup instance
+   * @param {Config}  config  The Config instance
+   *
+   * @memberOf OAuth2
+   */
+  constructor(storage: Storage, popup: Popup, config: BaseConfig) {
     this.storage      = storage;
     this.config       = config;
     this.popup        = popup;
     this.defaults     = {
-      url: null,
-      name: null,
-      state: null,
-      scope: null,
-      scopeDelimiter: null,
-      redirectUri: null,
-      popupOptions: null,
+      url                  : null,
+      name                 : null,
+      state                : null,
+      scope                : null,
+      scopeDelimiter       : null,
+      redirectUri          : null,
+      popupOptions         : null,
       authorizationEndpoint: null,
-      responseParams: null,
-      requiredUrlParams: null,
-      optionalUrlParams: null,
-      defaultUrlParams: ['response_type', 'client_id', 'redirect_uri'],
-      responseType: 'code'
+      responseParams       : null,
+      requiredUrlParams    : null,
+      optionalUrlParams    : null,
+      defaultUrlParams     : ['response_type', 'client_id', 'redirect_uri'],
+      responseType         : 'code'
     };
   }
 
-  open(options, userData) {
+  /**
+   * Open OAuth2 flow
+   *
+   * @param {{}} options  OAuth2 and dialog options
+   * @param {{}} userData Extra data for the authentications server
+   * @returns {Promise<any>} Authentication server response
+   *
+   * @memberOf OAuth2
+   */
+  open(options: {}, userData: {}): Promise<any> {
     const provider  = extend(true, {}, this.defaults, options);
     const stateName = provider.name + '_state';
 
@@ -721,22 +844,33 @@ export class OAuth2 {
 
     return openPopup
       .then(oauthData => {
-        if (provider.responseType === 'token' ||
-            provider.responseType === 'id_token token' ||
-            provider.responseType === 'token id_token'
+        if (provider.responseType === 'token'
+          || provider.responseType === 'id_token token'
+          || provider.responseType === 'token id_token'
         ) {
           return oauthData;
         }
         if (oauthData.state && oauthData.state !== this.storage.get(stateName)) {
           return Promise.reject('OAuth 2.0 state parameter mismatch.');
         }
+
         return this.exchangeForToken(oauthData, userData, provider);
       });
   }
 
-  exchangeForToken(oauthData, userData, provider) {
+  /**
+   * Exchange the code from the external provider by a token from the authentication server
+   *
+   * @param {{}} oauthData The oauth data from the external provider
+   * @param {{}} userData Extra data for the authentications server
+   * @param {string} provider The name of the provider
+   * @returns {Promise<any>} The authenticaion server response with the token
+   *
+   * @memberOf OAuth2
+   */
+  exchangeForToken(oauthData: {}, userData: {}, provider: string): Promise<any> {
     const data = extend(true, {}, userData, {
-      clientId: provider.clientId,
+      clientId   : provider.clientId,
       redirectUri: provider.redirectUri
     }, oauthData);
 
@@ -746,12 +880,20 @@ export class OAuth2 {
     return this.config.client.post(serverUrl, data, {credentials: credentials});
   }
 
-  buildQuery(provider) {
+  /**
+   * Create the query string for a provider
+   *
+   * @param {string} provider The provider name
+   * @returns {string} The resulting query string
+   *
+   * @memberOf OAuth2
+   */
+  buildQuery(provider: string): string {
     let query = {};
     const urlParams   = ['defaultUrlParams', 'requiredUrlParams', 'optionalUrlParams'];
 
-    urlParams.forEach( params => {
-      (provider[params] || []).forEach( paramName => {
+    urlParams.forEach(params => {
+      (provider[params] || []).forEach(paramName => {
         const camelizedName = camelCase(paramName);
         let paramValue      = (typeof provider[paramName] === 'function')
                               ? provider[paramName]()
@@ -772,19 +914,72 @@ export class OAuth2 {
         query[paramName] = paramValue;
       });
     });
+
+    return query;
+  }
+
+  /**
+   * Send logout request to oath2 rpovider
+   *
+   * @param {[{}]} options Logout option
+   * @returns {Promise<any>} The OAuth provider response
+   *
+   * @memberOf OAuth2
+   */
+  close(options?: {}): Promise<any> {
+    const provider  = extend(true, {}, this.defaults, options);
+    const url       = provider.logoutEndpoint + '?'
+                    + buildQueryString(this.buildLogoutQuery(provider));
+    const popup     = this.popup.open(url, provider.name, provider.popupOptions);
+    const openPopup = (this.config.platform === 'mobile')
+                    ? popup.eventListener(provider.postLogoutRedirectUri)
+                    : popup.pollPopup();
+
+    return openPopup;
+  }
+
+  /**
+   * Build query for logout request
+   *
+   * @param {string} provider The rpovider name
+   * @returns {string} The logout query string
+   *
+   * @memberOf OAuth2
+   */
+  buildLogoutQuery(provider: string): string {
+    let query = {};
+    let authResponse = this.storage.get(this.config.storageKey);
+
+    if (provider.postLogoutRedirectUri) {
+      query.post_logout_redirect_uri = provider.postLogoutRedirectUri;
+    }
+    if (this.storage.get(provider.name + '_state')) {
+      query.state = this.storage.get(provider.name + '_state');
+    }
+    if (JSON.parse(authResponse).id_token) {
+      query.id_token_hint = JSON.parse(authResponse).id_token;
+    }
+
     return query;
   }
 }
 
-const camelCase = function(name) {
-  return name.replace(/([\:\-\_]+(.))/g, function(_, separator, letter, offset) {
+/**
+ * camelCase a string
+ *
+ * @param {any} name String to be camelized
+ * @returns {string} The camelized name
+ */
+function camelCase(name: string): string {
+  return name.replace(/([:\-_]+(.))/g, function(_, separator, letter, offset) {
     return offset ? letter.toUpperCase() : letter;
   });
-};
+}
 
+/* eslint-disable max-lines */
 @inject(Storage, BaseConfig, OAuth1, OAuth2, AuthLock)
 export class Authentication {
-  constructor(storage, config, oAuth1, oAuth2, auth0Lock) {
+  constructor(storage: Storage, config: BaseConfig, oAuth1: OAuth1, oAuth2: OAuth2, auth0Lock: AuthLock) {
     this.storage              = storage;
     this.config               = config;
     this.oAuth1               = oAuth1;
@@ -799,9 +994,7 @@ export class Authentication {
     this.responseAnalyzed     = false;
   }
 
-
   /* deprecated methods */
-
   @deprecated({message: 'Use baseConfig.loginRoute instead.'})
   getLoginRoute() {
     return this.config.loginRoute;
@@ -832,31 +1025,38 @@ export class Authentication {
     return this.getAccessToken();
   }
 
-  get responseObject() {
-    LogManager.getLogger('authentication').warn('Getter Authentication.responseObject is deprecated. Use Authentication.getResponseObject() instead.');
+  get responseObject(): {} {
+    logger.warn('Getter Authentication.responseObject is deprecated. Use Authentication.getResponseObject() instead.');
+
     return this.getResponseObject();
   }
 
-  set responseObject(response) {
-    LogManager.getLogger('authentication').warn('Setter Authentication.responseObject is deprecated. Use AuthServive.setResponseObject(response) instead.');
+  set responseObject(response: {}) {
+    logger.warn('Setter Authentication.responseObject is deprecated. Use AuthServive.setResponseObject(response) instead.');
     this.setResponseObject(response);
   }
 
-  get hasDataStored() {
-    LogManager.getLogger('authentication').warn('Authentication.hasDataStored is deprecated. Use Authentication.responseAnalyzed instead.');
+  get hasDataStored(): boolean {
+    logger.warn('Authentication.hasDataStored is deprecated. Use Authentication.responseAnalyzed instead.');
+
     return this.responseAnalyzed;
   }
 
   /* get/set responseObject */
-
-  getResponseObject() {
+  getResponseObject(): {} {
     return JSON.parse(this.storage.get(this.config.storageKey));
   }
 
-  setResponseObject(response) {
+  setResponseObject(response: {}) {
     if (response) {
+      if (this.config.keepOldResponseProperties) {
+        let oldResponse = this.getResponseObject();
+
+        response = Object.assign({}, oldResponse, response);
+      }
       this.getDataFromResponse(response);
       this.storage.set(this.config.storageKey, JSON.stringify(response));
+
       return;
     }
     this.accessToken      = null;
@@ -869,64 +1069,68 @@ export class Authentication {
     this.storage.remove(this.config.storageKey);
   }
 
-
   /* get data, update if needed first */
-
-  getAccessToken() {
+  getAccessToken(): string {
     if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
     return this.accessToken;
   }
 
-  getRefreshToken() {
+  getRefreshToken(): string {
     if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
     return this.refreshToken;
   }
 
-  getIdToken() {
+  getIdToken(): string {
     if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
     return this.idToken;
   }
 
-  getPayload() {
+  getPayload(): {} {
     if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
     return this.payload;
   }
 
-  getExp() {
+  getIdPayload(): {} {
     if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
+    return this.idPayload;
+  }
+
+  getExp(): number {
+    if (!this.responseAnalyzed) this.getDataFromResponse(this.getResponseObject());
+
     return this.exp;
   }
 
-
  /* get status from data */
-
-  getTtl() {
+  getTtl(): number {
     const exp = this.getExp();
+
     return  Number.isNaN(exp) ? NaN : exp - Math.round(new Date().getTime() / 1000);
   }
 
-  isTokenExpired() {
+  isTokenExpired(): boolean {
     const timeLeft = this.getTtl();
+
     return Number.isNaN(timeLeft) ? undefined : timeLeft < 0;
   }
 
-  isAuthenticated() {
-    const isTokenExpired = this.isTokenExpired();
-    if (isTokenExpired === undefined ) return this.accessToken ? true : false;
-    return !isTokenExpired;
+  isAuthenticated(): boolean {
+    return !!this.getAccessToken() && !this.isTokenExpired();
   }
 
-
   /* get and set from response */
-
-  getDataFromResponse(response) {
+  getDataFromResponse(response: {}): {} {
     const config   = this.config;
 
     // get access token either with from supplied parameters or with supplied function
     this.accessToken = typeof this.config.getAccessTokenFromResponse === 'function'
                      ? this.config.getAccessTokenFromResponse(response)
                      : this.getTokenFromResponse(response, config.accessTokenProp, config.accessTokenName, config.accessTokenRoot);
-
 
     this.refreshToken = null;
     if (config.useRefreshToken) {
@@ -938,7 +1142,7 @@ export class Authentication {
       } catch (e) {
         this.refreshToken = null;
 
-        LogManager.getLogger('authentication').warn('useRefreshToken is set, but could not extract a refresh token');
+        logger.warn('useRefreshToken is set, but could not extract a refresh token');
       }
     }
 
@@ -949,28 +1153,37 @@ export class Authentication {
       this.idToken = null;
     }
 
-    this.payload = null;
-    try {
-      this.payload = this.accessToken ? jwtDecode(this.accessToken) : null;
-    } catch (_) {_;}
+    this.payload   = getPayload(this.accessToken);
+    this.idPayload = getPayload(this.idToken);
 
     // get exp either with from jwt or with supplied function
-    this.exp = typeof this.config.getExpirationDateFromResponse === 'function'
-            ? this.config.getExpirationDateFromResponse(response)
-            : (this.payload && parseInt(this.payload.exp, 10)) ||  NaN;
+    this.exp = parseInt((typeof this.config.getExpirationDateFromResponse === 'function'
+                        ? this.config.getExpirationDateFromResponse(response)
+                        : this.payload && this.payload.exp), 10) || NaN;
 
     this.responseAnalyzed = true;
 
     return {
-      accessToken: this.accessToken,
+      accessToken : this.accessToken,
       refreshToken: this.refreshToken,
-      idToken: this.idToken,
-      payload: this.payload,
-      exp: this.exp
+      idToken     : this.idToken,
+      payload     : this.payload,
+      exp         : this.exp
     };
   }
 
-  getTokenFromResponse(response, tokenProp, tokenName, tokenRoot) {
+  /**
+   * Extract the token from the server response
+   *
+   * @param {{}} response The response
+   * @param {string} tokenProp tokenProp
+   * @param {string} tokenName tokenName
+   * @param {string} tokenRoot tokenRoot
+   * @returns {string} The token
+   *
+   * @memberOf Authentication
+   */
+  getTokenFromResponse(response: {}, tokenProp: string, tokenName: string, tokenRoot: string): string {
     if (!response) return undefined;
 
     const responseTokenProp = tokenProp.split('.').reduce((o, x) => o[x], response);
@@ -983,47 +1196,60 @@ export class Authentication {
       const tokenRootData = tokenRoot && tokenRoot.split('.').reduce((o, x) => o[x], responseTokenProp);
       const token = tokenRootData ? tokenRootData[tokenName] : responseTokenProp[tokenName];
 
-      if (!token) throw new Error('Token not found in response');
+      if (!token) {
+        // if the token is not found in the response,
+        // throw an error along with the response object as a key
+        let error = new Error('Token not found in response');
+
+        error.responseObject = response;
+        throw error;
+      }
 
       return token;
     }
 
     const token = response[tokenName] === undefined ? null : response[tokenName];
 
-    if (!token) throw new Error('Token not found in response');
+    if (!token) {
+        // if the token is not found in the response,
+        // throw an error along with the response object as a key
+      let error = new Error('Token not found in response');
+
+      error.responseObject = response;
+      throw error;
+    }
 
     return token;
   }
 
-
-  toUpdateTokenCallstack() {
+  toUpdateTokenCallstack(): Promise<any> {
     return new Promise(resolve => this.updateTokenCallstack.push(resolve));
   }
 
-  resolveUpdateTokenCallstack(response) {
+  resolveUpdateTokenCallstack(response: {}) {
     this.updateTokenCallstack.map(resolve => resolve(response));
     this.updateTokenCallstack = [];
   }
 
-
   /**
    * Authenticate with third-party
    *
-   * @param {String}    name of the provider
-   * @param {[{}]}      [userData]
+   * @param {string}    name        Name of the provider
+   * @param {[{}]}      [userData]  Additional data send to the authentication server
    *
-   * @return {Promise<response>}
+   * @return {Promise<any>} The authentication server response
    */
-  authenticate(name, userData = {}) {
+  authenticate(name: string, userData: {} = {}): Promise<any> {
     let oauthType = this.config.providers[name].type;
 
     if (oauthType) {
-      LogManager.getLogger('authentication').warn('DEPRECATED: Setting provider.type is deprecated and replaced by provider.oauthType');
+      logger.warn('DEPRECATED: Setting provider.type is deprecated and replaced by provider.oauthType');
     } else {
       oauthType = this.config.providers[name].oauthType;
     }
 
     let providerLogin;
+
     if (oauthType === 'auth0-lock') {
       providerLogin = this.auth0Lock;
     } else {
@@ -1033,20 +1259,59 @@ export class Authentication {
     return providerLogin.open(this.config.providers[name], userData);
   }
 
-  redirect(redirectUrl, defaultRedirectUrl, query) {
+  /**
+   * Send logout request to oauth provider
+   *
+   * @param {string} name The provider name
+   * @returns {Promise<any>} The server response
+   *
+   * @memberOf Authentication
+   */
+  logout(name: string): Promise<any> {
+    let rtnValue = Promise.resolve('Not Applicable');
+
+    if (this.config.providers[name].oauthType !== '2.0' || !this.config.providers[name].logoutEndpoint) {
+      return rtnValue;
+    }
+
+    return this.oAuth2.close(this.config.providers[name]);
+  }
+
+  /**
+   * Redirect (page reload if applicable for the browsers save password option)
+   *
+   * @param {string}   redirectUrl The redirect url. To not redirect use an empty string.
+   * @param {[string]} defaultRedirectUrl The defaultRedirectUrl. Used when redirectUrl is undefined
+   * @param {[string]} query The optional query string to add the the url
+   * @returns {undefined} undefined
+   *
+   * @memberOf Authentication
+   */
+  redirect(redirectUrl: string, defaultRedirectUrl?: string, query?: string) {
     // stupid rule to keep it BC
     if (redirectUrl === true) {
-      LogManager.getLogger('authentication').warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === 0 instead.');
+      logger.warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === \'\' instead.');
+
       return;
     }
+
     // stupid rule to keep it BC
     if (redirectUrl === false) {
-      LogManager.getLogger('authentication').warn('BREAKING CHANGE: Setting redirectUrl === false to actually *do redirect* is deprecated. Set redirectUrl to undefined or null to use the defaultRedirectUrl if so desired.');
+      logger.warn('BREAKING CHANGE: Setting redirectUrl === false to actually *do redirect* is deprecated. Set redirectUrl to undefined or null to use the defaultRedirectUrl if so desired.');
     }
-    // BC hack. explicit 0 means don't redirect. false will be added later and 0 deprecated
+
+    // BC hack. explicit 0 means don't redirect. deprecated in favor of an empty string
     if (redirectUrl === 0) {
+      logger.warn('BREAKING CHANGE: Setting redirectUrl === 0 is deprecated. Set redirectUrl to \'\' instead.');
+
       return;
     }
+
+    // Empty string means don't redirect overwrite.
+    if (redirectUrl === '') {
+      return;
+    }
+
     if (typeof redirectUrl === 'string') {
       PLATFORM.location.href = encodeURI(redirectUrl + (query ? `?${buildQueryString(query)}` : ''));
     } else if (defaultRedirectUrl) {
@@ -1055,6 +1320,18 @@ export class Authentication {
   }
 }
 
+/* get payload from a token */
+function getPayload(token: string): {} {
+  let payload = null;
+
+  try {
+    payload =token ? jwtDecode(token) : null;
+  } catch (_) {} // eslint-disable-line no-empty
+
+  return payload;
+}
+
+/* eslint-disable max-lines */
 @inject(Authentication, BaseConfig, BindingSignaler, EventAggregator)
 export class AuthService {
   /**
@@ -1062,28 +1339,28 @@ export class AuthService {
    *
    * @param  {Authentication}
    */
-  authentication;
+  authentication: Authentication;
 
   /**
-   * The Config instance that contains the current configuration setting
+   * The BaseConfig instance that contains the current configuration setting
    *
-   * @param  {Config}
+   * @param  {BaseConfig}
    */
-  config;
+  config: BaseConfig;
 
   /**
    * The current login status
    *
-   * @param  {Boolean}
+   * @param  {boolean}
    */
-  authenticated  = false;
+  authenticated: boolean  = false;
 
   /**
    * The currently set timeoutID
    *
-   * @param  {Number}
+   * @param  {number}
    */
-  timeoutID = 0;
+  timeoutID: number = 0;
 
   /**
    *  Create an AuthService instance
@@ -1093,7 +1370,7 @@ export class AuthService {
    * @param  {BindingSignaler} bindingSignaler The BindingSignaler instance to be used
    * @param  {EventAggregator} eventAggregator The EventAggregator instance to be used
    */
-  constructor(authentication, config, bindingSignaler, eventAggregator) {
+  constructor(authentication: Authentication, config: BaseConfig, bindingSignaler: BindingSignaler, eventAggregator: EventAggregator) {
     this.authentication  = authentication;
     this.config          = config;
     this.bindingSignaler = bindingSignaler;
@@ -1106,8 +1383,9 @@ export class AuthService {
     const oldToken = authentication.storage.get(oldStorageKey);
 
     if (oldToken) {
-      LogManager.getLogger('authentication').info('Found token with deprecated format in storage. Converting it to new format. No further action required.');
+      logger.info('Found token with deprecated format in storage. Converting it to new format. No further action required.');
       let fakeOldResponse = {};
+
       fakeOldResponse[config.accessTokenProp] = oldToken;
       this.setResponseObject(fakeOldResponse);
       authentication.storage.remove(oldStorageKey);
@@ -1123,31 +1401,57 @@ export class AuthService {
   /**
    * The handler used for storage events. Detects and handles authentication changes in other tabs/windows
    *
-   * @param {StorageEvent}
+   * @param {StorageEvent} event StorageEvent
    */
-  storageEventHandler = event => {
-    if (event.key !== this.config.storageKey) {
+  storageEventHandler = (event: StorageEvent) => {
+    if (event.key !== this.config.storageKey || event.newValue === event.oldValue) {
       return;
     }
 
-    LogManager.getLogger('authentication').info('Stored token changed event');
+    // IE runs the event handler before updating the storage value. Update it now.
+    // An unset storage key in IE is an empty string, where-as chrome is null
+    if (event.newValue) {
+      this.authentication.storage.set(this.config.storageKey, event.newValue);
+    } else {
+      this.authentication.storage.remove(this.config.storageKey);
+    }
+
+    // in case auto refresh tokens are enabled, tokens are allowed to differ
+    // logouts (event.newValue===null) and logins (authentication.getAccessToken()===null), need to be handled bellow though
+    if (event.newValue && this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
+      // we need to set the whole response object again so that this.authentication.exp gets updated too
+      // this is critical for a scenario when two browser windows are open and one of them refreshes a token
+      this.setResponseObject(this.authentication.getResponseObject());
+
+      return;
+    }
+
+    logger.info('Stored token changed event');
 
     let wasAuthenticated = this.authenticated;
+
     this.authentication.responseAnalyzed = false;
     this.updateAuthenticated();
 
-    if (this.config.storageChangedRedirect && wasAuthenticated !== this.authenticated) {
-      PLATFORM.location.assign(this.config.storageChangedRedirect);
+    if (wasAuthenticated === this.authenticated) {
+      return;
+    }
+
+    if (this.config.storageChangedRedirect) {
+      PLATFORM.location.href = this.config.storageChangedRedirect;
+    }
+
+    if (this.config.storageChangedReload) {
+      PLATFORM.location.reload();
     }
   }
 
-
   /**
-   * Getter: The configured client for all aurelia-authentication requests
+   * Getter: The configured Rest client for all aurelia-authentication requests
    *
-   * @return {HttpClient}
+   * @return {Rest}
    */
-  get client() {
+  get client(): Rest {
     return this.config.client;
   }
 
@@ -1157,24 +1461,33 @@ export class AuthService {
    * @return {boolean}
    * @deprecated
    */
-  get auth() {
-    LogManager.getLogger('authentication').warn('AuthService.auth is deprecated. Use .authentication instead.');
+  get auth(): Authentication {
+    logger.warn('AuthService.auth is deprecated. Use .authentication instead.');
+
     return this.authentication;
   }
 
   /**
    * Sets the login timeout
    *
-   * @param  {Number} ttl  Timeout time in ms
+   * @param  {number} ttl  Timeout time in ms
    */
-  setTimeout(ttl) {
+  setTimeout(ttl: number) {
+    const maxTimeout = 2147483647; // maximum period in ms (ca. 24.85d) for windows.setTimeout
+
+    // limit timer ttl to max value allowed for windows.setTimeout function
+    if (ttl > maxTimeout) {
+      ttl = maxTimeout;
+      logger.warn('Token timeout limited to ', maxTimeout, ' ms (ca 24.85d).');
+    }
+
     this.clearTimeout();
 
-    this.timeoutID = PLATFORM.global.setTimeout(() => {
+    const expiredTokenHandler = () => {
       if (this.config.autoUpdateToken
         && this.authentication.getAccessToken()
         && this.authentication.getRefreshToken()) {
-        this.updateToken();
+        this.updateToken().catch(error => logger.warn(error.message));
 
         return;
       }
@@ -1184,7 +1497,14 @@ export class AuthService {
       if (this.config.expiredRedirect) {
         PLATFORM.location.assign(this.config.expiredRedirect);
       }
-    }, ttl);
+    };
+
+    this.timeoutID = PLATFORM.global.setTimeout(expiredTokenHandler, ttl);
+    PLATFORM.addEventListener('focus', () => {
+      if (this.isTokenExpired()) {
+        expiredTokenHandler();
+      }
+    });
   }
 
   /**
@@ -1200,9 +1520,9 @@ export class AuthService {
   /**
    * Stores and analyses the servers responseObject. Sets login status and timeout
    *
-   * @param {Object} response The servers response as GOJO
+   * @param {{}} response The servers response as object
    */
-  setResponseObject(response) {
+  setResponseObject(response: {}) {
     this.authentication.setResponseObject(response);
 
     this.updateAuthenticated();
@@ -1215,6 +1535,7 @@ export class AuthService {
     this.clearTimeout();
 
     let wasAuthenticated = this.authenticated;
+
     this.authenticated = this.authentication.isAuthenticated();
 
     if (this.authenticated && !Number.isNaN(this.authentication.exp)) {
@@ -1225,80 +1546,85 @@ export class AuthService {
       this.bindingSignaler.signal('authentication-change');
       this.eventAggregator.publish('authentication-change', this.authenticated);
 
-      LogManager.getLogger('authentication').info(`Authorization changed to: ${this.authenticated}`);
+      logger.info(`Authorization changed to: ${this.authenticated}`);
     }
   }
 
   /**
    * Get current user profile from server
    *
-   * @param {[{}|number|string]}  [criteriaOrId object or a Number|String converted to {id: criteriaOrId}]
+   * @param {({}|number|string)} [criteriaOrId] (optional) An object or a number|string converted to {id: criteriaOrId}
+   * @returns {Promise<any>} The server response
    *
-   * @return {Promise<response>}
+   * @memberOf AuthService
    */
-  getMe(criteriaOrId) {
+  getMe(criteriaOrId?: {}|number|string): Promise<any> {
     if (typeof criteriaOrId === 'string' || typeof criteriaOrId === 'number') {
       criteriaOrId = {id: criteriaOrId};
     }
+
     return this.client.find(this.config.joinBase(this.config.profileUrl), criteriaOrId);
   }
 
   /**
    * Send current user profile update to server
-
-   * @param {any}                 Request body with data.
-   * @param {[{}|Number|String]}  [criteriaOrId object or a Number|String converted to {id: criteriaOrId}]
    *
-   * @return {Promise<response>}
+   * @param {{}}                body           Request body with data.
+   * @param {{}|number|string}  [criteriaOrId] (optional) An object or a number|string converted to {id: criteriaOrId}
+   *
+   * @return {Promise<any>} The server response
    */
-  updateMe(body, criteriaOrId) {
+  updateMe(body: {}, criteriaOrId?: {}|number|string): Promise<any> {
     if (typeof criteriaOrId === 'string' || typeof criteriaOrId === 'number') {
-      criteriaOrId = { id: criteriaOrId };
+      criteriaOrId = {id: criteriaOrId};
     }
     if (this.config.profileMethod === 'put') {
       return this.client.update(this.config.joinBase(this.config.profileUrl), criteriaOrId, body);
     }
+
     return this.client.patch(this.config.joinBase(this.config.profileUrl), criteriaOrId, body);
   }
 
   /**
    * Get accessToken from storage
    *
-   * @returns {String} Current accessToken
+   * @returns {string} Current accessToken
    */
-  getAccessToken() {
+  getAccessToken(): string {
     return this.authentication.getAccessToken();
   }
 
   @deprecated({message: 'Use .getAccessToken() instead.'})
-  getCurrentToken() {
+  getCurrentToken(): string {
     return this.getAccessToken();
   }
 
   /**
    * Get refreshToken from storage
    *
-   * @returns {String} Current refreshToken
+   * @returns {string} Current refreshToken
    */
-  getRefreshToken() {
+  getRefreshToken(): string {
     return this.authentication.getRefreshToken();
   }
 
   /**
    * Get idToken from storage
    *
-   * @returns {String} Current idToken
+   * @returns {string} Current idToken
    */
-  getIdToken() {
+  getIdToken(): string {
     return this.authentication.getIdToken();
   }
 
  /**
   * Gets authentication status from storage
   *
-  * @returns {Boolean} For Non-JWT and unexpired JWT: true, else: false
+  * @param {[Function]} [callback] optional callback (authenticated: boolean) => void executed once the status is determined
+  *
+  * @returns {boolean} For Non-JWT and unexpired JWT: true, else: false
   */
-  isAuthenticated() {
+  isAuthenticated(callback?: (authenticated: boolean) => void): boolean {
     this.authentication.responseAnalyzed = false;
 
     let authenticated = this.authentication.isAuthenticated();
@@ -1307,9 +1633,27 @@ export class AuthService {
     if (!authenticated
       && this.config.autoUpdateToken
       && this.authentication.getAccessToken()
-      && this.authentication.getRefreshToken()) {
-      this.updateToken();
+      && this.authentication.getRefreshToken()
+    ) {
+      this.updateToken()
+        .then(() => {
+          // call callback with now updated status
+          if (typeof callback === 'function') {
+            callback(this.authenticated); // eslint-disable-line callback-return
+          }
+        })
+        .catch(error => logger.warn(error.message));
+
       authenticated = true;
+    } else if (typeof callback === 'function') {
+      // ensure consistent execution order with a 'delayed' callback
+      PLATFORM.global.setTimeout(() => {
+        try {
+          callback(authenticated); // eslint-disable-line callback-return
+        } catch(error) {
+          logger.warn(error.message);
+        }
+      }, 1);
     }
 
     return authenticated;
@@ -1318,66 +1662,95 @@ export class AuthService {
   /**
    * Gets exp in milliseconds
    *
-   * @returns {Number} Exp for JWT tokens, NaN for all other tokens
+   * @returns {number} Exp for JWT tokens, NaN for all other tokens
    */
-  getExp() {
+  getExp(): number {
     return this.authentication.getExp();
   }
 
   /**
    * Gets ttl in seconds
    *
-   * @returns {Number} Ttl for JWT tokens, NaN for all other tokens
+   * @returns {number} Ttl for JWT tokens, NaN for all other tokens
    */
-  getTtl() {
+  getTtl(): number {
     return this.authentication.getTtl();
   }
 
  /**
   * Gets exp from token payload and compares to current time
   *
-  * @returns {Boolean} Returns (ttl > 0)? for JWT, undefined other tokens
+  * @returns {boolean} Returns (ttl > 0)? for JWT, undefined other tokens
   */
-  isTokenExpired() {
+  isTokenExpired(): boolean {
     return this.authentication.isTokenExpired();
   }
 
   /**
-  * Get payload from tokens
+  * Get payload from access token
   *
-  * @returns {Object} Payload for JWT, else null
+  * @returns {{}} Payload for JWT, else null
   */
-  getTokenPayload() {
+  getTokenPayload(): {} {
     return this.authentication.getPayload();
   }
 
   /**
-   * Request new accesss token
+  * Get payload from id token
+  *
+  * @returns {{}} Payload for JWT, else null
+  */
+  getIdTokenPayload(): {} {
+    return this.authentication.getIdPayload();
+  }
+
+  /**
+   * Request new access token
    *
-   * @returns {Promise<Response>} Requests new token. can be called multiple times
+   * @returns {Promise<any>} Requests new token. can be called multiple times
    */
-  updateToken() {
+  updateToken(): Promise<any> {
     if (!this.authentication.getRefreshToken()) {
       return Promise.reject(new Error('refreshToken not set'));
     }
 
     if (this.authentication.updateTokenCallstack.length === 0) {
-      const content = {
-        grant_type: 'refresh_token',
-        refresh_token: this.authentication.getRefreshToken(),
-        client_id: this.config.clientId ? this.config.clientId : undefined
+      let content = {
+        grant_type: 'refresh_token'
       };
+
+      if (this.config.clientId) {
+        content.client_id = this.config.clientId;
+      }
+      if (this.config.clientSecret) {
+        content.client_secret = this.config.clientSecret;
+      }
+
+      content[this.config.refreshTokenSubmitProp] = this.authentication.getRefreshToken();
 
       this.client.post(this.config.joinBase(this.config.refreshTokenUrl
                                             ? this.config.refreshTokenUrl
-                                            : this.config.loginUrl), content)
+                                            : this.config.loginUrl), content, this.config.getOptionsForTokenRequests())
         .then(response => {
           this.setResponseObject(response);
-          this.authentication.resolveUpdateTokenCallstack(this.isAuthenticated());
+          if (this.getAccessToken()) {
+            this.authentication.resolveUpdateTokenCallstack(this.isAuthenticated());
+          } else {
+            this.setResponseObject(null);
+
+            if (this.config.expiredRedirect) {
+            PLATFORM.location.assign(this.config.expiredRedirect);
+            }
+            this.authentication.resolveUpdateTokenCallstack(Promise.reject(new Error('accessToken not found in refreshToken response')));
+          }
         })
-        .catch(err => {
+        .catch(error => {
           this.setResponseObject(null);
-          this.authentication.resolveUpdateTokenCallstack(Promise.reject(err));
+
+          if (this.config.expiredRedirect) {
+            PLATFORM.location.assign(this.config.expiredRedirect);
+          }
+          this.authentication.resolveUpdateTokenCallstack(Promise.reject(error));
         });
     }
 
@@ -1387,86 +1760,97 @@ export class AuthService {
   /**
    * Signup locally. Login and redirect depending on config
    *
-   * @param {String|{}}   displayNameOrCredentials displayName | object with signup data.
-   * @param {[String]|{}} emailOrOptions           [email | options for post request]
-   * @param {[String]}    passwordOrRedirectUri    [password | optional redirectUri overwrite]
+   * @param {string|{}}   displayNameOrCredentials displayName | object with signup data.
+   * @param {[string]|{}} emailOrOptions           [email | options for post request]
+   * @param {[string]}    passwordOrRedirectUri    [password | optional redirectUri overwrite]
    * @param {[{}]}        options                  [options]
-   * @param {[String]}    redirectUri              [optional redirectUri overwrite]
+   * @param {[string]}    [redirectUri]            [optional redirectUri overwrite, ''= no redirection]
    *
-   * @return {Promise<Object>|Promise<Error>}     Server response as Object
+   * @return {Promise<any>} Server response as Object
    */
-  signup(displayNameOrCredentials, emailOrOptions, passwordOrRedirectUri, options, redirectUri) {
-    let content;
+  signup(displayNameOrCredentials: string|{}, emailOrOptions?: string|{}, passwordOrRedirectUri?: string, options?: {}, redirectUri?: string): Promise<any> {
+    let normalized = {};
 
-    if (typeof arguments[0] === 'object') {
-      content     = arguments[0];
-      options     = arguments[1];
-      redirectUri = arguments[2];
+    if (typeof displayNameOrCredentials === 'object') {
+      normalized.credentials = displayNameOrCredentials;
+      normalized.options     = emailOrOptions;
+      normalized.redirectUri = passwordOrRedirectUri;
     } else {
-      content = {
+      normalized.credentials = {
         'displayName': displayNameOrCredentials,
-        'email': emailOrOptions,
-        'password': passwordOrRedirectUri
+        'email'      : emailOrOptions,
+        'password'   : passwordOrRedirectUri
       };
+      normalized.options     = options;
+      normalized.redirectUri = redirectUri;
     }
-    return this.client.post(this.config.joinBase(this.config.signupUrl), content, options)
+
+    return this.client.post(this.config.joinBase(this.config.signupUrl), normalized.credentials, normalized.options)
       .then(response => {
         if (this.config.loginOnSignup) {
           this.setResponseObject(response);
         }
-        this.authentication.redirect(redirectUri, this.config.signupRedirect);
+        this.authentication.redirect(normalized.redirectUri, this.config.signupRedirect);
 
         return response;
       });
   }
 
   /**
-   * login locally. Redirect depending on config
+   * Login locally. Redirect depending on config
    *
-   * @param {[String]|{}} emailOrCredentials      email | object with signup data.
-   * @param {[String]}    [passwordOrOptions]     [password | options for post request]
+   * @param {[string]|{}} emailOrCredentials      email | object with signup data.
+   * @param {[string]}    [passwordOrOptions]     [password | options for post request]
    * @param {[{}]}        [optionsOrRedirectUri]  [options | redirectUri overwrite]]
-   * @param {[String]}    [redirectUri]           [optional redirectUri overwrite]
+   * @param {[string]}    [redirectUri]           [optional redirectUri overwrite, ''= no redirection]
    *
    * @return {Promise<Object>|Promise<Error>}    Server response as Object
    */
-  login(emailOrCredentials, passwordOrOptions, optionsOrRedirectUri, redirectUri) {
-    let content;
+  login(emailOrCredentials?: string|{}, passwordOrOptions?: string|{}, optionsOrRedirectUri?: {}, redirectUri?: string): Promise<any> {
+    let normalized = {};
 
-    if (typeof arguments[0] === 'object') {
-      content              = arguments[0];
-      optionsOrRedirectUri = arguments[1];
-      redirectUri          = arguments[2];
-    } else {
-      content = {
-        'email': emailOrCredentials,
+    if (typeof emailOrCredentials === 'object') {
+      normalized.credentials = emailOrCredentials;
+      normalized.options     = this.config.getOptionsForTokenRequests(passwordOrOptions);
+      normalized.redirectUri = optionsOrRedirectUri;
+    } else if (typeof emailOrCredentials === 'string') {
+      normalized.credentials = {
+        'email'   : emailOrCredentials,
         'password': passwordOrOptions
       };
-      optionsOrRedirectUri = optionsOrRedirectUri;
+      normalized.options     = this.config.getOptionsForTokenRequests(optionsOrRedirectUri);
+      normalized.redirectUri = redirectUri;
     }
 
     if (this.config.clientId) {
-      content.client_id = this.config.clientId;
+      normalized.credentials.client_id = this.config.clientId;
     }
 
-    return this.client.post(this.config.joinBase(this.config.loginUrl), content, optionsOrRedirectUri)
+    if (this.config.clientSecret) {
+      normalized.credentials.client_secret = this.config.clientSecret;
+    }
+
+    return this.client.post(this.config.joinBase(this.config.loginUrl), normalized.credentials, normalized.options)
       .then(response => {
         this.setResponseObject(response);
 
-        this.authentication.redirect(redirectUri, this.config.loginRedirect);
+        this.authentication.redirect(normalized.redirectUri, this.config.loginRedirect);
 
         return response;
       });
   }
 
   /**
-   * logout locally and redirect to redirectUri (if set) or redirectUri of config. Sends logout request first, if set in config
+   * Logout locally and redirect to redirectUri (if set) or redirectUri of config.
+   * Sends logout request first, if set in config
    *
-   * @param {[String]}    [redirectUri]                     [optional redirectUri overwrite]
+   * @param {[string]}    [redirectUri]    [optional redirectUri overwrite, ''= no redirection]
+   * @param {[string]}    [query]          [optional query string for the uri]
+   * @param {[string]}    [name]           [optional name Name of the provider]
    *
-   * @return {Promise<>|Promise<Object>|Promise<Error>}     Server response as Object
+   * @return {Promise<any>}     Server response as Object
    */
-  logout(redirectUri, query) {
+  logout(redirectUri?: string, query?: string, name?: string): Promise<any> {
     let localLogout = response => new Promise(resolve => {
       this.setResponseObject(null);
 
@@ -1475,25 +1859,41 @@ export class AuthService {
       if (typeof this.onLogout === 'function') {
         this.onLogout(response);
       }
-
       resolve(response);
     });
 
-    return (this.config.logoutUrl
-      ? this.client.request(this.config.logoutMethod, this.config.joinBase(this.config.logoutUrl)).then(localLogout)
-      : localLogout());
+    if (name) {
+      if (this.config.providers[name].logoutEndpoint) {
+        return this.authentication.logout(name)
+          .then(logoutResponse => {
+            let stateValue = this.authentication.storage.get(name + '_state');
+
+            if (logoutResponse.state !== stateValue) {
+              return Promise.reject('OAuth2 response state value differs');
+            }
+
+            return localLogout(logoutResponse);
+          });
+      }
+    } else {
+     return this.config.logoutUrl
+        ? this.client.request(this.config.logoutMethod, this.config.joinBase(this.config.logoutUrl))
+            .then(localLogout)
+            .catch(localLogout)
+        : localLogout();
+    }
   }
 
   /**
    * Authenticate with third-party and redirect to redirectUri (if set) or redirectUri of config
    *
-   * @param {String}    name          Name of the provider
-   * @param {[String]}  [redirectUri] [optional redirectUri overwrite]
+   * @param {string}    name          Name of the provider
+   * @param {[string]}  [redirectUri] [optional redirectUri overwrite]
    * @param {[{}]}      [userData]    [optional userData for the local authentication server]
    *
-   * @return {Promise<Object>|Promise<Error>}     Server response as Object
+   * @return {Promise<any>} Server response as Object
    */
-  authenticate(name, redirectUri, userData = {}) {
+  authenticate(name: string, redirectUri?: string, userData?: {}): Promise<any> {
     return this.authentication.authenticate(name, userData)
       .then(response => {
         this.setResponseObject(response);
@@ -1507,12 +1907,14 @@ export class AuthService {
   /**
    * Unlink third-party
    *
-   * @param {String}      name                  Name of the provider
+   * @param {string}    name          Name of the provider
+   * @param {[string]}  [redirectUri] [optional redirectUri overwrite]
    *
-   * @return {Promise<Object>|Promise<Error>}  Server response as Object
+   * @return {Promise<any>}  Server response as Object
    */
-  unlink(name, redirectUri) {
+  unlink(name: string, redirectUri?: string): Promise<any> {
     const unlinkUrl = this.config.joinBase(this.config.unlinkUrl) + name;
+
     return this.client.request(this.config.unlinkMethod, unlinkUrl)
       .then(response => {
         this.authentication.redirect(redirectUri);
@@ -1524,7 +1926,7 @@ export class AuthService {
 
 @inject(AuthService)
 export class AuthenticateStep {
-  constructor(authService) {
+  constructor(authService: AuthService) {
     this.authService = authService;
   }
 
@@ -1537,7 +1939,7 @@ export class AuthenticateStep {
         return next.cancel(new Redirect(loginRoute));
       }
     } else if (isLoggedIn && routingContext.getAllInstructions().some(route => route.fragment === loginRoute)) {
-      return next.cancel(new Redirect( this.authService.config.loginRedirect ));
+      return next.cancel(new Redirect(this.authService.config.loginRedirect));
     }
 
     return next();
@@ -1546,8 +1948,8 @@ export class AuthenticateStep {
 
 @inject(AuthService)
 export class AuthorizeStep {
-  constructor(authService) {
-    LogManager.getLogger('authentication').warn('AuthorizeStep is deprecated. Use AuthenticationStep instead.');
+  constructor(authService: AuthService) {
+    logger.warn('AuthorizeStep is deprecated. Use AuthenticateStep instead.');
 
     this.authService = authService;
   }
@@ -1561,7 +1963,7 @@ export class AuthorizeStep {
         return next.cancel(new Redirect(loginRoute));
       }
     } else if (isLoggedIn && routingContext.getAllInstructions().some(route => route.fragment === loginRoute)) {
-      return next.cancel(new Redirect( this.authService.config.loginRedirect ));
+      return next.cancel(new Redirect(this.authService.config.loginRedirect));
     }
 
     return next();
@@ -1573,12 +1975,12 @@ export class FetchConfig {
   /**
    * Construct the FetchConfig
    *
-   * @param {HttpClient} httpClient
-   * @param {Config} clientConfig
-   * @param {Authentication} authService
-   * @param {BaseConfig} config
+   * @param {HttpClient} httpClient httpClient
+   * @param {Config} clientConfig clientConfig
+   * @param {Authentication} authService authService
+   * @param {BaseConfig} config baseConfig
    */
-  constructor(httpClient, clientConfig, authService, config) {
+  constructor(httpClient: HttpClient, clientConfig: Config, authService: Authentication, config: BaseConfig) {
     this.httpClient   = httpClient;
     this.clientConfig = clientConfig;
     this.authService  = authService;
@@ -1588,9 +1990,9 @@ export class FetchConfig {
   /**
    * Interceptor for HttpClient
    *
-   * @return {{request: Function, response: Function}}
+   * @return {{request: Function, response: Function}} The interceptor
    */
-  get interceptor() {
+  get interceptor(): {request: Function, response: Function} {
     return {
       request: request => {
         if (!this.config.httpInterceptor || !this.authService.isAuthenticated()) {
@@ -1608,20 +2010,33 @@ export class FetchConfig {
       },
       response: (response, request) => {
         return new Promise((resolve, reject) => {
+          // resolve success
           if (response.ok) {
             return resolve(response);
           }
+          // resolve all non-authorization errors
           if (response.status !== 401) {
             return resolve(response);
           }
+          // when we get a 401 and are not logged in, there's not much to do except reject the request
+          if (!this.authService.authenticated) {
+            return reject(response);
+          }
+          // logout when server invalidated the authorization token but the token itself is still valid
+          if (this.config.httpInterceptor && this.config.logoutOnInvalidToken && !this.authService.isTokenExpired()) {
+            return reject(this.authService.logout());
+          }
+          // resolve unexpected authorization errors (not a managed request or token not expired)
           if (!this.config.httpInterceptor || !this.authService.isTokenExpired()) {
             return resolve(response);
           }
+          // resolve expected authorization error without refresh_token setup
           if (!this.config.useRefreshToken || !this.authService.getRefreshToken()) {
             return resolve(response);
           }
 
-          return this.authService.updateToken().then(() => {
+          // refresh token and try again
+          resolve(this.authService.updateToken().then(() => {
             let token = this.authService.getAccessToken();
 
             if (this.config.authTokenType) {
@@ -1630,8 +2045,8 @@ export class FetchConfig {
 
             request.headers.set(this.config.authHeader, token);
 
-            return this.client.fetch(request).then(resolve);
-          });
+            return this.httpClient.fetch(request).then(resolve);
+          }));
         });
       }
     };
@@ -1642,11 +2057,12 @@ export class FetchConfig {
    *
    * @param {HttpClient|Rest|string[]} client HttpClient, rest client or api endpoint name, or an array thereof
    *
-   * @return {HttpClient[]}
+   * @return {HttpClient[]} The configured client(s)
    */
-  configure(client) {
+  configure(client: HttpClient|Rest|Array<string>): HttpClient|Array<HttpClient> {
     if (Array.isArray(client)) {
       let configuredClients = [];
+
       client.forEach(toConfigure => {
         configuredClients.push(this.configure(toConfigure));
       });
@@ -1656,6 +2072,7 @@ export class FetchConfig {
 
     if (typeof client === 'string') {
       const endpoint = this.clientConfig.getEndpoint(client);
+
       if (!endpoint) {
         throw new Error(`There is no '${client || 'default'}' endpoint registered.`);
       }
@@ -1680,16 +2097,18 @@ export class FetchConfig {
 /**
  * Configure the plugin.
  *
- * @param {{globalResources: Function, container: {Container}}} aurelia
- * @param {{}|Function}                                         config
+ * @export
+ * @param {FrameworkConfiguration} frameworkConfig The FrameworkConfiguration instance
+ * @param {{}|Function}            config          The Config instance
+ *
  */
-export function configure(aurelia, config) {
+export function configure(frameworkConfig: { container: Container, globalResources: (...resources: string[]) => any }, config: {}|Function) {
   // ie9 polyfill
   if (!PLATFORM.location.origin) {
     PLATFORM.location.origin = PLATFORM.location.protocol + '//' + PLATFORM.location.hostname + (PLATFORM.location.port ? ':' + PLATFORM.location.port : '');
   }
 
-  const baseConfig = aurelia.container.get(BaseConfig);
+  const baseConfig = frameworkConfig.container.get(BaseConfig);
 
   if (typeof config === 'function') {
     config(baseConfig);
@@ -1699,11 +2118,11 @@ export function configure(aurelia, config) {
 
   // after baseConfig was configured
   for (let converter of baseConfig.globalValueConverters) {
-    aurelia.globalResources(`./${converter}`);
-    LogManager.getLogger('authentication').info(`Add globalResources value-converter: ${converter}`);
+    frameworkConfig.globalResources(PLATFORM.moduleName(`./${converter}`));
+    logger.info(`Add globalResources value-converter: ${converter}`);
   }
-  const fetchConfig  = aurelia.container.get(FetchConfig);
-  const clientConfig = aurelia.container.get(Config);
+  const fetchConfig  = frameworkConfig.container.get(FetchConfig);
+  const clientConfig = frameworkConfig.container.get(Config);
 
   // Array? Configure the provided endpoints.
   if (Array.isArray(baseConfig.configureEndpoints)) {
@@ -1718,6 +2137,7 @@ export function configure(aurelia, config) {
   if (baseConfig.endpoint !== null) {
     if (typeof baseConfig.endpoint === 'string') {
       const endpoint = clientConfig.getEndpoint(baseConfig.endpoint);
+
       if (!endpoint) {
         throw new Error(`There is no '${baseConfig.endpoint || 'default'}' endpoint registered.`);
       }
@@ -1729,7 +2149,7 @@ export function configure(aurelia, config) {
 
   // No? Fine. Default to HttpClient. BC all the way.
   if (!(client instanceof Rest)) {
-    client = new Rest(aurelia.container.get(HttpClient));
+    client = new Rest(frameworkConfig.container.get(HttpClient));
   }
 
   // Set the client on the config, for use throughout the plugin.

@@ -1,6 +1,13 @@
+'use strict';
+
+exports.__esModule = true;
+exports.AuthFilterValueConverter = undefined;
+
+var _aureliaRouter = require('aurelia-router');
 
 
-export var AuthFilterValueConverter = function () {
+
+var AuthFilterValueConverter = exports.AuthFilterValueConverter = function () {
   function AuthFilterValueConverter() {
     
   }
